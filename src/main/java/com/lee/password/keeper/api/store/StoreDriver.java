@@ -37,9 +37,18 @@ public interface StoreDriver {
 	 */
 	Result<List<Password.Header>> listPassword(String username);
 	
-	/** flush all the changed to the underlying storage **/
-	boolean flush();
+	/**
+	 * undo the last changed operation, return the undo target entry if success.
+	 * subsequent undo call will be failed after you call {@link #flush()}. 
+	 */
+	Result<?> undo();
+	
+	/** redo the last changed operation, return the redo target entry if success **/
+	Result<?> redo();
+	
+	/** flush all the changed operation to the underlying storage **/
+	Result<Throwable> flush();
 	
 	/** close this driver and releases any system resources associated with the driver. **/
-	void close();
+	Result<Throwable> close();
 }

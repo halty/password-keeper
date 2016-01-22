@@ -1,5 +1,6 @@
 package com.lee.password.keeper;
 
+import java.nio.ByteBuffer;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -12,8 +13,19 @@ import com.lee.password.keeper.impl.crypto.rsa.RSAKeyGenerator;
 public class MainTest {
 
 	public static void main(String[] args) throws Exception {
-		String str = "https://www.zhihu.com/question/39638115";
-		System.out.println(str.length());
+		testByteBuffer();
+	}
+	
+	private static void testByteBuffer() {
+		ByteBuffer buf = ByteBuffer.allocate(10);
+		for(int i=0; i<10; i++) { buf.put((byte)i); }
+		buf.flip();
+		System.out.println(buf.get() == 0);
+		System.out.println(buf.get() == 1);
+		buf.position(6);
+		System.out.println(buf.get() == 6);
+		buf.position(9);
+		System.out.println(buf.get() == 9);
 	}
 
 	private static void testEpoch() throws Exception {

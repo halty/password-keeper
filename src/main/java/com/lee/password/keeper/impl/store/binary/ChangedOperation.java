@@ -3,7 +3,7 @@ package com.lee.password.keeper.impl.store.binary;
 public class ChangedOperation<T> {
 
 	public static enum OP {
-		DELETE(1),  INSERT(2), UPDATE(3);
+		INSERT(1), UPDATE(2), DELETE(3);
 		public final int order;
 		private OP(int order) { this.order = order; }
 	}

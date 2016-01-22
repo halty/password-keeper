@@ -2,21 +2,19 @@ package com.lee.password.keeper.impl.store.binary;
 
 import static com.lee.password.keeper.api.store.Password.CHARSET;
 
+import java.nio.ByteBuffer;
+
 import com.lee.password.keeper.impl.util.Base64Variants;
 
 public class BinaryPassword {
 
 	private static final int MAX_USER_NAME_LEN = 48;	// 48 bytes
-	private static final int MAX_PASSWORD_LEN = 128;	// 128 bytes
-	private static final int MAX_KEY_VALUE_PAIR_LEN = 128;	// 128 bytes
-	
-	/** total bytes to place a binary password entry **/
-	public static final int TOTAL_BYTES =
-			(Integer.SIZE / Byte.SIZE)	// websiteId
-			+ 1 + MAX_USER_NAME_LEN	// username (len + data)
-			+ (Long.SIZE / Byte.SIZE)	// timestamp
-			+ 1 + MAX_PASSWORD_LEN	// encryptedPassword (len + data)
-			+ 1 + MAX_KEY_VALUE_PAIR_LEN;	// encryptedKeyValuePairs (len + data)
+	public static final long FIXED_OCCUPIED_BYTES =
+			8	// websiteId
+			+ 1 + MAX_USER_NAME_LEN	// username (size + data)
+			+ 8	// timestamp
+			+ 2 + 0	// encryptedPassword (size + data)
+			+ 2 + 0;	// encryptedKeyValuePairs (size + data)
 	
 	private final long websiteId;
 	private final byte[] username;
@@ -33,14 +31,43 @@ public class BinaryPassword {
 	private static final int ENCRYPT_PWD_CHANGED_MASK = 0x01;
 	private static final int ENCRYPT_KVP_CHANGED_MASK = 0x02;
 	
-	public BinaryPassword(long websiteId, String username, long timestamp) {
+	/** return the bytes of this object occupied in store file **/
+	public static long occupiedSize(int secretBlockSize) { return FIXED_OCCUPIED_BYTES + secretBlockSize * 2; }
+	
+	public static BinaryPassword load(ByteBuffer buffer, int secretBlockSize) {
+		long websiteId = buffer.getLong();
+		int len = 0xff & buffer.get();
+		byte[] username = new byte[len];
+		buffer.get(username);
+		buffer.position(buffer.position() + (MAX_USER_NAME_LEN - len)); // skip remaining bytes with username slot
+		long timestamp = buffer.getLong();
+		len = 0xffff & buffer.getShort();
+		byte[] encryptedPassword = new byte[len];
+		buffer.get(encryptedPassword);
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+		len = 0xffff & buffer.getShort();
+		byte[] encryptedKeyValuePairs = new byte[len];
+		if(len > 0) { buffer.get(encryptedKeyValuePairs); }		// maybe empty
+		BinaryPassword password = new BinaryPassword(websiteId, username, timestamp);
+		password.encryptedPassword(encryptedPassword);
+		password.encryptedKeyValuePairs(encryptedKeyValuePairs);
+		return password;
+	}
+	
+	private BinaryPassword(long websiteId, byte[] usernameBytes, long timestamp) {
 		this.websiteId = websiteId;
-		this.username = toBytes(username, MAX_USER_NAME_LEN, "username");
+		this.username = usernameBytes;
 		this.timestamp = timestamp;
 		this.changedFlag = 0;
 	}
 	
-	private byte[] toBytes(String value, int maxLength, String name) {
+	public BinaryPassword(long websiteId, String username, long timestamp) {
+		this(websiteId,
+			 toBytes(username, MAX_USER_NAME_LEN, "username"),
+			 timestamp);
+	}
+	
+	private static byte[] toBytes(String value, int maxLength, String name) {
 		byte[] bytes = Base64Variants.encode(value, CHARSET);
 		if(bytes.length > maxLength) {
 			throw new IllegalArgumentException(
