@@ -5,7 +5,11 @@ import static com.lee.password.keeper.api.store.Password.CHARSET;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 
-public class BinaryWebsite {
+import com.lee.password.keeper.api.store.StoreException;
+import com.lee.password.keeper.api.store.Website;
+import com.lee.password.keeper.impl.InternalEntity;
+
+public class BinaryWebsite implements InternalEntity {
 	
 	private static final long EPOCH = epoch();
 	private static final int EPOCH_TIME_BITS = 40;	// high 40 bits, support up to 2050-11-03 19:53:47 GMT
@@ -24,10 +28,10 @@ public class BinaryWebsite {
 	public static final long UNDEF_OFFSET = -1;
 	
 	private final long websiteId;	// consist of epoch time(high 40 bits) and hash code of keyword(low 24bits)
-	private final byte[] keyword;
+	private byte[] keyword;
 	private byte[] url;
-	private int count;
-	private long offset;
+	private int count;		// number of password entries of this website
+	private long offset;	// offset of password entries based on password data start index
 	private long timestamp;
 	
 	/**
@@ -37,9 +41,10 @@ public class BinaryWebsite {
 	 * offset - 3rd bit
 	 */
 	private byte changedFlag;
-	private static final int URL_CHANGED_MASK = 0x01;
-	private static final int CNT_CHANGED_MASK = 0x02;
-	private static final int OFT_CHANGED_MASK = 0x04;
+	private static final int KWD_CHANGED_MASK = 0x01;
+	private static final int URL_CHANGED_MASK = 0x02;
+	private static final int CNT_CHANGED_MASK = 0x04;
+	private static final int OFT_CHANGED_MASK = 0x08;
 	
 	private static long epoch() {
 		String epochDate = "2016-01-01 00:00:00 GMT";
@@ -76,6 +81,10 @@ public class BinaryWebsite {
 		return website;
 	}
 	
+	public static BinaryWebsite cast(Website website) {
+		return new BinaryWebsite(website.timestamp(), website.keyword(), website.url());
+	}
+	
 	private BinaryWebsite(long websiteId, long timestamp, byte[] keywordBytes, byte[] urlBytes) {
 		this.websiteId = websiteId;
 		this.keyword = keywordBytes;
@@ -86,7 +95,7 @@ public class BinaryWebsite {
 		this.changedFlag = 0;
 	}
 	
-	public BinaryWebsite(long timestamp, String keyword, String url) {
+	private BinaryWebsite(long timestamp, String keyword, String url) {
 		this(createWebsiteId(timestamp, hash(keyword)),
 			 timestamp,
 			 toBytes(keyword, MAX_KEYWORD_BYTES, "keyword"),
@@ -110,21 +119,48 @@ public class BinaryWebsite {
 	}
 	
 	private static byte[] toBytes(String value, int maxLength, String name) {
+		if(value == null || value.isEmpty()) {
+			throw new StoreException(name + "is empty");
+		}
 		byte[] bytes = value.getBytes(CHARSET);
 		if(bytes.length > maxLength) {
-			throw new IllegalArgumentException(
+			throw new StoreException(
 					String.format("%s length exceed max limit (%d bytes)", name, maxLength));
 		}
 		return bytes;
+	}
+	
+	public BinaryWebsite copy() {
+		BinaryWebsite newWebsite = new BinaryWebsite(websiteId, timestamp, keyword, url);
+		newWebsite.count = this.count;
+		newWebsite.offset = this.offset;
+		newWebsite.changedFlag = this.changedFlag;
+		return newWebsite;
+	}
+	
+	public Website transform() {
+		Website website = new Website(timestamp, websiteId);
+		website.keyword(keyword());
+		website.url(url());
+		return website;
 	}
 	
 	public long websiteId() { return websiteId; }
 
 	public long createTimestamp() { return (websiteId >>> EPOCH_TIME_BITS) + EPOCH; }
 	
-	public long modifiedTimestamp() { return timestamp; }
+	public long timestamp() { return timestamp; }
+	
+	public void timestamp(long timestamp) { this.timestamp = timestamp; }
 
 	public String keyword() { return new String(keyword, CHARSET); }
+	
+	public void keyword(String keyword) { this.keyword = toBytes(keyword, MAX_KEYWORD_BYTES, "keyword"); }
+	
+	public void changeKeyword(String keyword) {
+		this.keyword = toBytes(keyword, MAX_KEYWORD_BYTES, "keyword");
+		changedFlag |= KWD_CHANGED_MASK;
+	}
 
 	public String url() { return new String(url, CHARSET); }
 	
@@ -152,4 +188,16 @@ public class BinaryWebsite {
 		this.offset = offset;
 		changedFlag |= OFT_CHANGED_MASK;
 	}
+	
+	public boolean isKeywordChanged() { return (changedFlag & KWD_CHANGED_MASK) != 0; }
+	public void markKeywordChanged() { changedFlag |= KWD_CHANGED_MASK; }
+	public boolean isUrlChanged() { return (changedFlag & URL_CHANGED_MASK) != 0; }
+	public void markUrlChanged() { changedFlag |= URL_CHANGED_MASK; }
+	public boolean isCountChanged() { return (changedFlag & CNT_CHANGED_MASK) != 0; }
+	public void markCountChanged() { changedFlag |= CNT_CHANGED_MASK; }
+	public boolean isOffsetChanged() { return (changedFlag & OFT_CHANGED_MASK) != 0; }
+	public void markOffsetChanged() { changedFlag |= OFT_CHANGED_MASK; }
+
+	@Override
+	public Type type() { return Type.WEBSITE; }
 }

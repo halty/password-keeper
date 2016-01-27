@@ -8,6 +8,8 @@ import java.security.spec.X509EncodedKeySpec;
 
 import javax.crypto.Cipher;
 
+import com.lee.password.keeper.api.crypto.CryptoException;
+
 public class RSACryptor implements RSAConstants {
 	
 	public static byte[] encrypt(byte[] data, byte[] publicKey) {
@@ -19,7 +21,7 @@ public class RSACryptor implements RSAConstants {
 			cipher.init(Cipher.ENCRYPT_MODE, key);
 			return cipher.doFinal(data);
 		}catch(Exception e) {
-			throw new RuntimeException("failed to encrypt data with "+TRANSFORMATION, e);
+			throw new CryptoException("failed to encrypt data with "+TRANSFORMATION, e);
 		}
 	}
 	
@@ -32,7 +34,7 @@ public class RSACryptor implements RSAConstants {
 			cipher.init(Cipher.DECRYPT_MODE, key);
 			return cipher.doFinal(secret);
 		}catch(Exception e) {
-			throw new RuntimeException("failed to decrypt secret with "+TRANSFORMATION, e);
+			throw new CryptoException("failed to decrypt secret with "+TRANSFORMATION, e);
 		}
 	}
 	

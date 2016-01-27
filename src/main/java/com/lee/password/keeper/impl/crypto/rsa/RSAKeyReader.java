@@ -6,8 +6,9 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 
+import com.lee.password.keeper.api.crypto.CryptoException;
 import com.lee.password.keeper.api.crypto.CryptoKey;
-import com.lee.password.keeper.api.crypto.CryptoKey.Type;
+import com.lee.password.keeper.api.crypto.CryptoKey.KeyType;
 
 public class RSAKeyReader implements RSAConstants {
 	
@@ -18,7 +19,7 @@ public class RSAKeyReader implements RSAConstants {
 	private static File exists(File parent, String fileName) {
 		File file = new File(parent, fileName);
 		if(file.exists() && file.isFile()) { return file; }
-		throw new IllegalArgumentException(file + "don't exist or is not a file");
+		throw new CryptoException(file + "don't exist or is not a file");
 	}
 
 	public static CryptoKey deserializePublicKey(File destFile) {
@@ -42,12 +43,12 @@ public class RSAKeyReader implements RSAConstants {
 			byte[] encoded = new byte[encodedLength];
 			int count = dis.read(encoded);
 			if(count != encodedLength) {
-				throw new IllegalStateException(String.format("incorrect key length for key file {%s}", destFile));
+				throw new CryptoException(String.format("incorrect key length for key file {%s}", destFile));
 			}
 			dis.close();
 			return new CryptoKey(keyVerifier.keyType(), maxBlockSize, destFile.getAbsolutePath(), encoded);
 		}catch(IOException e) {
-			throw new RuntimeException(String.format("failed to deserialize key from {%s}", destFile));
+			throw new CryptoException(String.format("failed to deserialize key from {%s}", destFile));
 		}finally {
 			if(fis != null) {
 				try { fis.close(); }catch(Exception e) { /** can not do anything **/ }
@@ -55,15 +56,15 @@ public class RSAKeyReader implements RSAConstants {
 		}
 	}
 	
-	private static final KeyVerifier PUBLIC_KEY_VERIFIER = new KeyVerifier(Type.PUBLIC, ALGORITHM, PUBLIC_KEY_FORMAT);
-	private static final KeyVerifier PRIVATE_KEY_VERIFIER = new KeyVerifier(Type.PRIVATE, ALGORITHM, PRIVATE_KEY_FORMAT);
+	private static final KeyVerifier PUBLIC_KEY_VERIFIER = new KeyVerifier(KeyType.PUBLIC, ALGORITHM, PUBLIC_KEY_FORMAT);
+	private static final KeyVerifier PRIVATE_KEY_VERIFIER = new KeyVerifier(KeyType.PRIVATE, ALGORITHM, PRIVATE_KEY_FORMAT);
 	
 	private static class KeyVerifier {
-		private final Type expectKeyType;
+		private final KeyType expectKeyType;
 		private final String expectAlgorithm;
 		private final String expectFormat;
 		
-		KeyVerifier(Type expectKeyType, String expectAlgorithm, String expectFormat) {
+		KeyVerifier(KeyType expectKeyType, String expectAlgorithm, String expectFormat) {
 			this.expectKeyType = expectKeyType;
 			this.expectAlgorithm = expectAlgorithm;
 			this.expectFormat = expectFormat;
@@ -71,22 +72,22 @@ public class RSAKeyReader implements RSAConstants {
 		
 		final void verifyKeyType(int keyType) {
 			if(expectKeyType.code != keyType) {
-				throw new IllegalStateException(String.format("expect key type {%s} but {%d}", expectKeyType, keyType));
+				throw new CryptoException(String.format("expect key type {%s} but {%d}", expectKeyType, keyType));
 			}
 		}
 		
 		final void verifyAlgorithm(String algorithm) {
 			if(!expectAlgorithm.equalsIgnoreCase(algorithm)) {
-				throw new IllegalStateException(String.format("expect algorithm {%s} but {%s}", expectAlgorithm, algorithm));
+				throw new CryptoException(String.format("expect algorithm {%s} but {%s}", expectAlgorithm, algorithm));
 			}
 		}
 		
 		final void verifyFormat(String format) {
 			if(!expectFormat.equalsIgnoreCase(format)) {
-				throw new IllegalStateException(String.format("expect format {%s} but {%s}", expectFormat, format));
+				throw new CryptoException(String.format("expect format {%s} but {%s}", expectFormat, format));
 			}
 		}
 		
-		final Type keyType() { return expectKeyType; }
+		final KeyType keyType() { return expectKeyType; }
 	}
 }

@@ -19,4 +19,6 @@ public class Result<T> {
 		this.msg = msg;
 		this.result = result;
 	}
+	
+	public boolean isSuccess() { return code == Code.SUCCESS; }
 }

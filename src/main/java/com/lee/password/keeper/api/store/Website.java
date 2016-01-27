@@ -1,29 +1,69 @@
 package com.lee.password.keeper.api.store;
 
+import com.lee.password.keeper.api.Entity;
+
 /** website **/
-public class Website {
-	
-	private final String keyword;
-	
-	private final String url;
-	
+public class Website implements Entity {
+
 	private final long timestamp;
 	
-	private int id;
+	private String keyword;
+	
+	private String url;
+	
+	private long id;
+	
+	private boolean hasId;
+	private boolean hasKeyword;
+	
+	public Website(long id) { this(System.currentTimeMillis(), id); }
+	
+	public Website(long timestamp, long id) {
+		this.timestamp = timestamp;
+		this.id = id;
+		this.hasId = true;
+	}
+	
+	public Website(String keyword) {
+		this.timestamp = System.currentTimeMillis();
+		this.keyword = keyword;
+		this.hasKeyword = isNotEmpty(keyword);
+	}
 	
 	public Website(String keyword, String url) {
+		this.timestamp = System.currentTimeMillis();
 		this.keyword = keyword;
 		this.url = url;
-		this.timestamp = System.currentTimeMillis();
+		this.hasKeyword = isNotEmpty(keyword);
 	}
-
-	public String keyword() { return keyword; }
-
-	public String url() { return url; }
+	
+	private static boolean isNotEmpty(String str) { return str != null && !str.isEmpty(); }
 	
 	public long timestamp() { return timestamp; }
-	
-	public int id() { return id; }
 
-	public void id(int id) { this.id = id; }
+	public String keyword() { return keyword; }
+	
+	public void keyword(String keyword) {
+		this.keyword = keyword;
+		this.hasKeyword = isNotEmpty(keyword);
+	}
+
+	public String url() { return url; }
+
+	public void url(String url) { this.url = url; }
+	
+	public long id() { return id; }
+
+	public void id(long id) {
+		this.id = id;
+		this.hasId = true;
+	}
+	
+	/** if this method return {@code false}, then {@link #id()} behavior is undefined **/
+	public boolean hasId() { return hasId; }
+	
+	public boolean hasKeyword() { return hasKeyword; }
+
+	@Override
+	public Type type() { return Type.WEBSITE; }
 }

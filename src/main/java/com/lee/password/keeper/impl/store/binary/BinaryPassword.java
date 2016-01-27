@@ -4,9 +4,12 @@ import static com.lee.password.keeper.api.store.Password.CHARSET;
 
 import java.nio.ByteBuffer;
 
+import com.lee.password.keeper.api.store.Password;
+import com.lee.password.keeper.api.store.StoreException;
+import com.lee.password.keeper.impl.InternalEntity;
 import com.lee.password.keeper.impl.util.Base64Variants;
 
-public class BinaryPassword {
+public class BinaryPassword implements InternalEntity {
 
 	private static final int MAX_USER_NAME_LEN = 48;	// 48 bytes
 	public static final long FIXED_OCCUPIED_BYTES =
@@ -54,6 +57,33 @@ public class BinaryPassword {
 		return password;
 	}
 	
+	public static boolean hasEqualUsername(BinaryPassword one, BinaryPassword another) {
+		return byteCompare(one.username, another.username);
+	}
+	
+	private static boolean byteCompare(byte[] one, byte[] another) {
+		if(one == another) { return true; }
+		int oneLen = one.length;
+		int anotherLen = another.length;
+		if(oneLen != anotherLen) { return false; }
+		for(int i=0; i<oneLen; i++) {
+			if(one[i] != another[i]) { return false; }
+		}
+		return true;
+	}
+	
+	public static boolean hasEqualWebsiteId(BinaryPassword one, BinaryPassword another) {
+		return one.websiteId == another.websiteId;
+	}
+	
+	public static boolean hasEqualPassword(BinaryPassword one, BinaryPassword another) {
+		return byteCompare(one.encryptedPassword, another.encryptedPassword);
+	}
+	
+	public static boolean hasEqualKeyValuePair(BinaryPassword one, BinaryPassword another) {
+		return byteCompare(one.encryptedKeyValuePairs, another.encryptedKeyValuePairs);
+	}
+	
 	private BinaryPassword(long websiteId, byte[] usernameBytes, long timestamp) {
 		this.websiteId = websiteId;
 		this.username = usernameBytes;
@@ -68,13 +98,25 @@ public class BinaryPassword {
 	}
 	
 	private static byte[] toBytes(String value, int maxLength, String name) {
+		if(value == null || value.isEmpty()) {
+			throw new StoreException(name + "is empty");
+		}
 		byte[] bytes = Base64Variants.encode(value, CHARSET);
 		if(bytes.length > maxLength) {
-			throw new IllegalArgumentException(
+			throw new StoreException(
 					String.format("%s length exceed max limit (%d bytes)", name, maxLength));
 		}
 		return bytes;
 	}
+	
+	public BinaryPassword copy() {
+		BinaryPassword password = new BinaryPassword(websiteId, username, timestamp);
+		password.encryptedPassword(encryptedPassword);
+		password.encryptedKeyValuePairs(encryptedKeyValuePairs);
+		return password;
+	}
+	
+	public Password transformWithSecret() { return new Password(websiteId, username()); }
 
 	public long websiteId() { return websiteId; }
 
@@ -85,20 +127,22 @@ public class BinaryPassword {
 	public byte[] encryptedPassword() { return encryptedPassword; }
 
 	public void encryptedPassword(byte[] encryptedPassword) { this.encryptedPassword = encryptedPassword; }
-	
-	/** change the encrypted password and set the changed flag **/
-	public void changeEncryptedPassword(byte[] encryptedPassword) {
-		this.encryptedPassword = encryptedPassword;
-		changedFlag |= ENCRYPT_PWD_CHANGED_MASK;
-	}
 
 	public byte[] encryptedKeyValuePairs() { return encryptedKeyValuePairs; }
 
 	public void encryptedKeyValuePairs(byte[] encryptedKeyValuePairs) { this.encryptedKeyValuePairs = encryptedKeyValuePairs; }
 	
-	/** change the encrypted key-value pair and set the changed flag **/
-	public void changeEncryptedKeyValuePairs(byte[] encryptedKeyValuePairs) {
-		this.encryptedKeyValuePairs = encryptedKeyValuePairs;
-		changedFlag |= ENCRYPT_KVP_CHANGED_MASK;
-	}
+	
+	/** mark the encrypted password changed flag **/
+	public void markEncryptedPasswordChanged() { changedFlag |= ENCRYPT_PWD_CHANGED_MASK; }
+	
+	/** mark the encrypted key-value pair changed flag **/
+	public void markEncryptedKeyValuePairsChanged() { changedFlag |= ENCRYPT_KVP_CHANGED_MASK; }
+	
+	public boolean isEncryptedPasswordChanged() { return (changedFlag & ENCRYPT_PWD_CHANGED_MASK) != 0; }
+	
+	public boolean isEncryptedKeyValuePairsChanged() { return (changedFlag & ENCRYPT_KVP_CHANGED_MASK) != 0; }
+
+	@Override
+	public Type type() { return Type.PASSWORD; }
 }

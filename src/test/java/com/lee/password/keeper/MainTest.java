@@ -1,11 +1,14 @@
 package com.lee.password.keeper;
 
+import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import com.lee.password.keeper.impl.crypto.rsa.RSACryptor;
 import com.lee.password.keeper.impl.crypto.rsa.RSAKeyGenerator;
@@ -13,8 +16,19 @@ import com.lee.password.keeper.impl.crypto.rsa.RSAKeyGenerator;
 public class MainTest {
 
 	public static void main(String[] args) throws Exception {
-		testByteBuffer();
+		// testByteBuffer();
+		// testCrypto();
+		String a = "1";
+		String b = same(a);
+		System.out.println(b == a);
+		Map m1 = new HashMap();
+		m1.put(1, a);
+		Map m2 = new HashMap();
+		m2.put(1, b);
+		System.out.println(m1.get(1) == m2.get(1));
 	}
+	
+	private static String same(String str) { return str; }
 	
 	private static void testByteBuffer() {
 		ByteBuffer buf = ByteBuffer.allocate(10);
@@ -44,7 +58,7 @@ public class MainTest {
 		PublicKey publicKey = keyPair.getPublic();
 		PrivateKey privateKey = keyPair.getPrivate();
 		// String data = "13641815806";
-		String str = "halty86@gmail.com";
+		String str = "";
 		byte[] data = str.getBytes("UTF-8");
 		byte[] publicEncoded = publicKey.getEncoded();
 		byte[] privateEncoded = privateKey.getEncoded();

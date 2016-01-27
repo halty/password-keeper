@@ -9,7 +9,7 @@ import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.Result.Code;
 import com.lee.password.keeper.api.crypto.CryptoDriver;
 import com.lee.password.keeper.api.crypto.CryptoKey;
-import com.lee.password.keeper.api.crypto.CryptoKey.Type;
+import com.lee.password.keeper.api.crypto.CryptoKey.KeyType;
 import com.lee.password.keeper.impl.crypto.rsa.RSACryptor;
 import com.lee.password.keeper.impl.crypto.rsa.RSAKeyGenerator;
 import com.lee.password.keeper.impl.crypto.rsa.RSAKeyReader;
@@ -43,8 +43,8 @@ public class RSACryptoDriver implements CryptoDriver {
 			int maxSecretBlockSize = RSACryptor.maxSecretBlockSize(keySize);
 			String privateKeyPath = RSAKeyWriter.serializePrivateKey(privateKey, maxSecretBlockSize, destDir);
 			CryptoKey[] resultKey = new CryptoKey[] {
-					new CryptoKey(Type.PUBLIC, maxDataBlockSize, publicKeyPath, publicKey.getEncoded()),
-					new CryptoKey(Type.PRIVATE, maxSecretBlockSize, privateKeyPath, privateKey.getEncoded())
+					new CryptoKey(KeyType.PUBLIC, maxDataBlockSize, publicKeyPath, publicKey.getEncoded()),
+					new CryptoKey(KeyType.PRIVATE, maxSecretBlockSize, privateKeyPath, privateKey.getEncoded())
 			};
 			return new Result<CryptoKey[]>(Code.SUCCESS, "success", resultKey);
 		}catch(Exception e) {
@@ -87,7 +87,7 @@ public class RSACryptoDriver implements CryptoDriver {
 	@Override
 	public Result<byte[]> encrypt(byte[] data, CryptoKey key) {
 		try {
-			if(Type.PUBLIC != key.type()) {
+			if(KeyType.PUBLIC != key.keyType()) {
 				return new Result<byte[]>(Code.FAIL, "incorrect key type fro encryption: "+key.type());
 			}
 			if(data.length > key.maxBlockSize()) {
@@ -103,7 +103,7 @@ public class RSACryptoDriver implements CryptoDriver {
 	@Override
 	public Result<byte[]> decrypt(byte[] secret, CryptoKey key) {
 		try {
-			if(Type.PRIVATE != key.type()) {
+			if(KeyType.PRIVATE != key.keyType()) {
 				return new Result<byte[]>(Code.FAIL, "incorrect key type for decryption: "+key.type());
 			}
 			if(secret.length > key.maxBlockSize()) {

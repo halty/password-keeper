@@ -2,21 +2,23 @@ package com.lee.password.keeper.impl.store.binary;
 
 public class ChangedOperation<T> {
 
-	public static enum OP {
-		INSERT(1), UPDATE(2), DELETE(3);
-		public final int order;
-		private OP(int order) { this.order = order; }
-	}
+	public static enum OP { INSERT, DELETE, UPDATE; }
 	
 	private final OP op;
-	private final T target;
+	private final T after;
+	private final T before;
 	
-	public ChangedOperation(OP op, T target) {
+	public ChangedOperation(T before, OP op, T after) {
 		this.op = op;
-		this.target = target;
+		this.after = after;
+		this.before = before;
 	}
 
 	public OP op() { return op; }
 
-	public T target() { return target; }
+	/** the target state after apply this opertaion **/
+	public T after() { return after; }
+	
+	/** the target state before apply this opertaion **/
+	public T before() { return before; }
 }

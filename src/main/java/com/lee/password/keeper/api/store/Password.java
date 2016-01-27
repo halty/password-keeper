@@ -1,36 +1,44 @@
 package com.lee.password.keeper.api.store;
 
 import java.io.UnsupportedEncodingException;
+import java.net.URLDecoder;
 import java.net.URLEncoder;
 import java.nio.charset.Charset;
 
-public class Password {
+import com.lee.password.keeper.api.Entity;
+
+public class Password implements Entity {
 	
 	public static final Charset CHARSET = Charset.forName("UTF-8");
 	
 	private final Header header;
-	private final Entity entity;
+	private final Secret secret;
 	
-	public Password(int websiteId, String username) {
+	public Password(long websiteId, String username) {
 		this.header = new Header(websiteId, username);
-		this.entity = new Entity();
+		this.secret = new Secret();
 	}
 
-	public Header getHeader() { return header; }
+	public Header header() { return header; }
 
-	public Entity getEntity() { return entity; }
+	public Secret secret() { return secret; }
 
 	public Password password(String password) {
-		entity.password = password;
+		secret.password = password;
 		return this;
 	}
 	
 	public Password pairOf(String key, String value) {
-		if(entity.keyValuePairs == null) {
-			entity.keyValuePairs = new StringBuilder().append(encode(key)).append("=").append(encode(value));
+		if(secret.keyValuePairs == null) {
+			secret.keyValuePairs = new StringBuilder().append(encode(key)).append("=").append(encode(value));
 		}else {
-			entity.keyValuePairs.append("&").append(encode(key)).append("=").append(encode(value));
+			secret.keyValuePairs.append("&").append(encode(key)).append("=").append(encode(value));
 		}
+		return this;
+	}
+	
+	public Password keyValuePairs(String kvp) {
+		secret.keyValuePairs = new StringBuilder(kvp.length()).append(decode(kvp));
 		return this;
 	}
 	
@@ -42,29 +50,60 @@ public class Password {
 			return value;
 		}
 	}
+	
+	private static String decode(String value) {
+		try {
+			return URLDecoder.decode(value, CHARSET.name());
+		}catch(UnsupportedEncodingException e) {
+			// don't support utf-8 charset, heh...
+			return value;
+		}
+	}
 
 	public static class Header {
+		
+		private final long timestamp;
 
-		private final int websiteId;
+		private long websiteId;
 		
 		private String username;
 		
-		private long timestamp;
+		private boolean hasId;
+		private boolean hasUsername;
 		
-		public Header(int websiteId, String username) {
+		public Header(long websiteId) {
 			this.websiteId = websiteId;
-			this.username = username;
+			this.hasId = true;
 			this.timestamp = System.currentTimeMillis();
 		}
 		
-		public int websiteId() { return websiteId; }
+		public Header(String username) {
+			this.username = username;
+			this.hasUsername = isNotEmpty(username); 
+			this.timestamp = System.currentTimeMillis();
+		}
 		
-		public String username() { return username; }
+		public Header(long websiteId, String username) {
+			this.websiteId = websiteId;
+			this.hasId = true;
+			this.username = username;
+			this.hasUsername = isNotEmpty(username); 
+			this.timestamp = System.currentTimeMillis();
+		}
+		
+		private static boolean isNotEmpty(String str) { return str != null && !str.isEmpty(); }
 
 		public long timestamp() { return timestamp; }
+		
+		public long websiteId() { return websiteId; }
+		
+		public String username() { return username; }
+		
+		public boolean hasId() { return hasId; }
+		public boolean hasUsername() { return hasUsername; }
 	}
 	
-	public static class Entity {
+	public static class Secret {
 	
 		private String password;
 		
@@ -72,7 +111,10 @@ public class Password {
 		
 		public String password() { return password; }
 		
-		public String keyValuePairs() { return keyValuePairs.toString(); }
+		public String keyValuePairs() { return keyValuePairs == null ? "" : keyValuePairs.toString(); }
 	}
+
+	@Override
+	public Type type() { return Type.PASSWORD; }
 	
 }

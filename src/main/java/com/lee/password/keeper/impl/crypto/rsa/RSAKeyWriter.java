@@ -9,7 +9,8 @@ import java.security.Key;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 
-import com.lee.password.keeper.api.crypto.CryptoKey.Type;
+import com.lee.password.keeper.api.crypto.CryptoException;
+import com.lee.password.keeper.api.crypto.CryptoKey.KeyType;
 
 public class RSAKeyWriter implements RSAConstants {
 	
@@ -17,26 +18,26 @@ public class RSAKeyWriter implements RSAConstants {
 		File dir = new File(destDir);
 		if(!dir.exists()) {
 			if(dir.mkdirs()) { return dir; }
-			throw new IllegalArgumentException(destDir + " create failed");
+			throw new CryptoException(destDir + " create failed");
 		}else {
 			if(dir.isDirectory()) { return dir; }
-			throw new IllegalArgumentException(destDir + " is not a directory");
+			throw new CryptoException(destDir + " is not a directory");
 		}
 	}
 	
 	/** serialize the public key to the {@code destDir} and return the file path **/
 	public static String serializePublicKey(PublicKey publicKey, int maxDataBlockSize, File destDir) {
-		return serializeTo(publicKey, Type.PUBLIC, maxDataBlockSize, new File(destDir, PUBLIC_KEY_FILE));
+		return serializeTo(publicKey, KeyType.PUBLIC, maxDataBlockSize, new File(destDir, PUBLIC_KEY_FILE));
 	}
 	
 	/** serialize the private key to the {@code destDir} and return the file path **/
 	public static String serializePrivateKey(PrivateKey privateKey, int maxSecretBlockSize, File destDir) {
-		return serializeTo(privateKey, Type.PRIVATE, maxSecretBlockSize, new File(destDir, PRIVATE_KEY_FILE));
+		return serializeTo(privateKey, KeyType.PRIVATE, maxSecretBlockSize, new File(destDir, PRIVATE_KEY_FILE));
 	}
 	
-	private static String serializeTo(Key key, Type keyType, int maxBlockSize, File destFile) {
+	private static String serializeTo(Key key, KeyType keyType, int maxBlockSize, File destFile) {
 		if(destFile.exists() && destFile.length() > 0) {
-			throw new IllegalArgumentException(destFile + "exists, please check no duplicate file");
+			throw new CryptoException(destFile + "exists, please check no duplicate file");
 		}
 		FileOutputStream fos = null;
 		try {
@@ -53,7 +54,7 @@ public class RSAKeyWriter implements RSAConstants {
 			
 			return destFile.getAbsolutePath();
 		}catch(IOException e) {
-			throw new RuntimeException(String.format("failed to serialize key with type {%d} to {%s}", keyType, destFile));
+			throw new CryptoException(String.format("failed to serialize key with type {%d} to {%s}", keyType, destFile));
 		}finally {
 			if(fos != null) {
 				try { fos.close(); }catch(Exception e) { /** can not do anything **/ }

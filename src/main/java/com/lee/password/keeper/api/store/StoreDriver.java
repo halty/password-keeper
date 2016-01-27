@@ -2,7 +2,9 @@ package com.lee.password.keeper.api.store;
 
 import java.util.List;
 
+import com.lee.password.keeper.api.Entity;
 import com.lee.password.keeper.api.Result;
+import com.lee.password.keeper.api.crypto.CryptoKey;
 
 public interface StoreDriver {
 
@@ -14,22 +16,30 @@ public interface StoreDriver {
 	
 	Result<Website> selectWebsite(Website website);
 	
+	Result<Integer> websiteCount();
+	
 	/** list all website entry **/ 
 	Result<List<Website>> listWebsite();
 	
-	Result<Password> insertPassword(Password entry);
+	Result<Password.Header> insertPassword(Password entry, CryptoKey encryptKey);
 	
-	Result<Password> deletePassword(Password.Header header);
+	Result<Password.Header> deletePassword(Password.Header header);
 	
-	Result<Password> updatePassword(Password entry);
+	Result<Password.Header> updatePassword(Password entry, CryptoKey encryptKey);
 	
-	Result<Password> selectPassword(Password.Header header);
+	Result<Password> selectPassword(Password.Header header, CryptoKey decryptKey);
+	
+	Result<Integer> passwordCount();
+	
+	Result<Integer> passwordCount(long websiteId);
+	
+	Result<Integer> passwordCount(String username);
 	
 	/**
 	 * list all password entry with only <code>website</code> and <code>username</code>
 	 * by <code>website id</code>.
 	 */ 
-	Result<List<Password.Header>> listPassword(int websiteId);
+	Result<List<Password.Header>> listPassword(long websiteId);
 	
 	/**
 	 * list all password entry with only <code>website</code> and <code>username</code>
@@ -37,14 +47,20 @@ public interface StoreDriver {
 	 */
 	Result<List<Password.Header>> listPassword(String username);
 	
+	Result<Integer> canUndoTimes();
+	
+	Result<Integer> canRedoTimes();
+	
 	/**
 	 * undo the last changed operation, return the undo target entry if success.
 	 * subsequent undo call will be failed after you call {@link #flush()}. 
 	 */
-	Result<?> undo();
+	Result<Entity> undo();
 	
 	/** redo the last changed operation, return the redo target entry if success **/
-	Result<?> redo();
+	Result<Entity> redo();
+	
+	Result<Integer> needFlushCount();
 	
 	/** flush all the changed operation to the underlying storage **/
 	Result<Throwable> flush();
