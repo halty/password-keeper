@@ -14,7 +14,6 @@ import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
-import java.nio.channels.FileChannel.MapMode;
 import java.nio.channels.FileLock;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -23,9 +22,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-import java.util.SortedMap;
-import java.util.TreeMap;
 
 import com.lee.password.keeper.api.Entity;
 import com.lee.password.keeper.api.Entity.Type;
@@ -49,20 +45,21 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private static final byte[] MAGIC = "bpsd".getBytes(CHARSET);
 	
+	private static final int META_DATA_LEN = 4 + 8 + 4 + 8;	
+	
 	/** secret block size defined by private crypto key **/
 	private final int secretBlockSize;
 	
-	/** encryption/decryption driver  **/
+	// encryption/decryption driver
 	private CryptoDriver cryptoDriver;
 	
-	/** storage resources **/
+	// storage resources
 	private File storePath;
 	private RandomAccessFile storeMappedFile;
 	private FileChannel storeChannel;
 	private FileLock storeLock;
 	
-	/** metadata **/
-	private static final long META_DATA_LEN = 4 + 8 + 4 + 8;
+	// metadata
 	/** the number of password **/
 	private int passwordCount;
 	/** the offset of password in channel **/
@@ -72,16 +69,35 @@ public class BinaryStoreDriver implements StoreDriver {
 	/** the offset of website in channel **/
 	private long websiteOffset;
 	
-	/** index password and website **/
+	// index password and website
 	private Map<PasswordKey, BinaryPassword> passwordMap;
-	private SortedMap<Long, List<BinaryPassword>> websiteIdPwdMap;
+	private Map<Long, List<BinaryPassword>> websiteIdPwdMap;
 	private Map<String, List<BinaryPassword>> usernamePwdMap;
-	private SortedMap<Long, BinaryWebsite> websiteIdMap;
+	private Map<Long, BinaryWebsite> websiteIdMap;
 	private Map<String, BinaryWebsite> websiteKeywordMap;
 	
-	/** change operation queue **/
+	// change operation queue
 	private Deque<ChangedOperation<? extends InternalEntity>> undoQueue;
 	private Deque<ChangedOperation<? extends InternalEntity>> redoQueue;
+	
+	// sync buffer
+	/** metadata buffer layout: passwordCount(4) + passwordOffset(8) + websiteCount(4) + websiteOffset(8) **/
+	private ByteBuffer metadataBuffer;
+	private BinaryWebsite[] sortedWebsitesBuffer;
+	
+	// flush I/O buffer
+	private ByteBuffer intBuffer;
+	private ByteBuffer longBuffer;
+	private ByteBuffer usernameBuffer;
+	private ByteBuffer keywordBuffer;
+	private ByteBuffer urlPortionWebsiteBuffer;
+	private ByteBuffer webPortionWebsiteBuffer;
+	private ByteBuffer pwdPortionWebsiteBuffer;
+	private ByteBuffer websiteBuffer;
+	private ByteBuffer keyValuePairBuffer;
+	private ByteBuffer pwdPortionPasswordBuffer;
+	private ByteBuffer pwdAndKvpPortionPasswordBuffer;
+	private ByteBuffer passwordBuffer;
 	
 	/** closed flag **/
 	private boolean isClosed;
@@ -138,12 +154,13 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void init() throws Exception {
+		initUndoAndRedoDeque();
+		initFlushIOBuffer();
 		if(storePath.length() == 0) { // created new file
 			initStore();
 		}else {
 			loadStore();
 		}
-		initUndoAndRedoDeque();
 		isClosed = false;
 	}
 	
@@ -152,26 +169,25 @@ public class BinaryStoreDriver implements StoreDriver {
 		FileOutputStream fos = null;
 		DataOutputStream dos = null;
 		try {
-			fos = new FileOutputStream(storePath);
-			dos = new DataOutputStream(new BufferedOutputStream(fos));
 			long offset = MAGIC.length + META_DATA_LEN;
-			dos.write(MAGIC);
-			dos.writeInt(0);	// passwordCount
-			dos.writeLong(offset);	// passwordOffset
-			dos.writeInt(0);	// websiteCount
-			dos.writeLong(offset);	// websiteOffset
-			dos.flush();
-			
 			this.passwordCount = 0;
 			this.passwordOffset = offset;
 			this.websiteCount = 0;
 			this.websiteOffset = offset;
+			this.metadataBuffer = initMetaBuffer(passwordCount, passwordOffset, websiteCount, websiteOffset);
+			metadataBuffer.clear();
+			fos = new FileOutputStream(storePath);
+			dos = new DataOutputStream(new BufferedOutputStream(fos));
+			dos.write(MAGIC);
+			dos.write(metadataBuffer.array());
+			dos.flush();
 			
 			this.passwordMap = new HashMap<PasswordKey, BinaryPassword>();
-			this.websiteIdPwdMap = new TreeMap<Long, List<BinaryPassword>>();
+			this.websiteIdPwdMap = new HashMap<Long, List<BinaryPassword>>();
 			this.usernamePwdMap = new HashMap<String, List<BinaryPassword>>();
-			this.websiteIdMap = new TreeMap<Long, BinaryWebsite>();
+			this.websiteIdMap = new HashMap<Long, BinaryWebsite>();
 			this.websiteKeywordMap = new HashMap<String, BinaryWebsite>();
+			this.sortedWebsitesBuffer = new BinaryWebsite[10];
 		}finally {
 			try {
 				if(dos != null) { dos.close(); }
@@ -180,9 +196,13 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 	}
 	
-	private void initUndoAndRedoDeque() {
-		this.undoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
-		this.redoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
+	private ByteBuffer initMetaBuffer(int passwordCount, long passwordOffset, int websiteCount, long websiteOffset) {
+		ByteBuffer buf = ByteBuffer.allocate(META_DATA_LEN).order(ByteOrder.BIG_ENDIAN)
+				.putInt(passwordCount)
+				.putLong(passwordOffset)
+				.putInt(websiteCount)
+				.putLong(websiteOffset);
+		return buf;
 	}
 	
 	/** load all the data from file to memory **/
@@ -222,10 +242,13 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void loadMetadata(DataInputStream dis) {
 		try {
-			this.passwordCount = dis.readInt();
-			this.passwordOffset = dis.readLong();
-			this.websiteCount = dis.readInt();
-			this.websiteOffset = dis.readLong();
+			byte[] bytes = new byte[META_DATA_LEN];
+			dis.readFully(bytes);
+			this.metadataBuffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+			this.passwordCount = metadataBuffer.getInt();
+			this.passwordOffset = metadataBuffer.getLong();
+			this.websiteCount = metadataBuffer.getInt();
+			this.websiteOffset = metadataBuffer.getLong();
 		}catch(IOException e) {
 			throw new StoreException("failed to load meta data from store path: "+storePath);
 		}
@@ -234,29 +257,39 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void loadWebsites() throws IOException {
 		long position = this.websiteOffset;
 		int count = this.websiteCount;
-		this.websiteIdMap = new TreeMap<Long, BinaryWebsite>();
-		this.websiteKeywordMap = new HashMap<String, BinaryWebsite>();		
+		this.websiteIdMap = new HashMap<Long, BinaryWebsite>(count);
+		this.websiteKeywordMap = new HashMap<String, BinaryWebsite>(count);
+		this.sortedWebsitesBuffer = new BinaryWebsite[10];
 		if(count == 0) { return; }
 		
-		long size = count * BinaryWebsite.occupiedSize();
-		ByteBuffer websitesBuffer = storeChannel.map(MapMode.READ_ONLY, position, size)
-				.order(ByteOrder.BIG_ENDIAN)
-				.asReadOnlyBuffer();
+		int size = count * BinaryWebsite.occupiedSize();
+		/* mapping is more expensive than reading or writing, it is only worth
+		 * mapping relatively large files.
+		 * generally, pasword store is a small file, so we use read or write methods here.
+		 */
+		ByteBuffer websitesBuffer = ByteBuffer.allocate(size);
+		int readBytes = storeChannel.read(websitesBuffer, position);
+		if(readBytes != size) {
+			throw new StoreException("incorrect website data size from store path: "+storePath);
+		}
+		websitesBuffer = websitesBuffer.order(ByteOrder.BIG_ENDIAN).asReadOnlyBuffer();
+		websitesBuffer.clear();
 		
 		long lastWebsiteId = Long.MIN_VALUE;
 		int totalPasswordCount = 0;
 		for(int i=0; i<count; i++) {
-			BinaryWebsite website = BinaryWebsite.load(websitesBuffer);
+			BinaryWebsite website = BinaryWebsite.read(websitesBuffer);
 			long websiteId = website.websiteId();
 			if(lastWebsiteId > websiteId) {
 				// website data placed order by website id asc in store file
 				throw new StoreException(String.format("incorrect website data order begining with %d from store path: %s",
 						websiteId, storePath));
 			}
-			if(!put(website)) {
+			if(!put(website, false)) {
 				throw new StoreException(String.format("conflict website with website id=%d from store path: %s",
 						websiteId, storePath));
 			}
+			addToSortedWebsitesBuffer(website.copy(), i);
 			lastWebsiteId = websiteId;
 			totalPasswordCount += website.count();
 		}
@@ -266,23 +299,70 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 	}
 	
+	private void addToSortedWebsitesBuffer(BinaryWebsite newWebsite, int existedCount) {
+		long targetWebsiteId = newWebsite.websiteId();
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		int insertingIndex = findInsertIndex(targetWebsiteId, array, 0, existedCount-1);
+		addToSortedWebsitesBuffer(newWebsite, insertingIndex, existedCount);
+	}
+	
+	private int findInsertIndex(long targetWebsiteId, BinaryWebsite[] array, int begin, int end) {
+		while(begin <= end) {
+			int mid = (begin + end) / 2;
+			long websiteId = array[mid].websiteId();
+			if(targetWebsiteId == websiteId) {
+				begin = mid + 1;
+				break;
+			}else if(targetWebsiteId < websiteId) {
+				end = mid -1;
+			}else {
+				begin = mid + 1;
+			}
+		}
+		return begin;
+	}
+	
+	private void addToSortedWebsitesBuffer(BinaryWebsite newWebsite, int index, int limit) {
+		if(index < 0 || index > limit) {
+			throw new IndexOutOfBoundsException(String.format("inserting index %d is out of bounds %d for sorted website buffer",
+					index, limit));
+		}
+		if(limit >= sortedWebsitesBuffer.length) {
+			int newCount = limit * 3 / 2 + 1;
+			BinaryWebsite[] array = new BinaryWebsite[newCount];
+			System.arraycopy(sortedWebsitesBuffer, 0, array, 0, limit);
+			sortedWebsitesBuffer = array;
+		}
+		if(index == limit) {
+			sortedWebsitesBuffer[limit] = newWebsite;
+		}else {
+			BinaryWebsite[] array = sortedWebsitesBuffer;
+			System.arraycopy(array, index, array, index+1, limit-index);
+			array[index] = newWebsite;
+		}
+	}
+	
 	private void loadPasswords() throws IOException {
 		long position = this.passwordOffset;
 		int count = this.passwordCount;
 		this.passwordMap = new HashMap<PasswordKey, BinaryPassword>(count);
-		this.websiteIdPwdMap = new TreeMap<Long, List<BinaryPassword>>();
+		this.websiteIdPwdMap = new HashMap<Long, List<BinaryPassword>>();
 		this.usernamePwdMap = new HashMap<String, List<BinaryPassword>>();
 		if(count == 0) { return; }
 		
-		long entrySize = BinaryPassword.occupiedSize(this.secretBlockSize);
-		long size = count * entrySize;
-		ByteBuffer passwordsBuffer = storeChannel.map(MapMode.READ_ONLY, position, size)
-				.order(ByteOrder.BIG_ENDIAN)
-				.asReadOnlyBuffer();
-		
+		int entrySize = BinaryPassword.occupiedSize(this.secretBlockSize);
+		int size = count * entrySize;
+		ByteBuffer passwordsBuffer = ByteBuffer.allocate(size);
+		int readBytes = storeChannel.read(passwordsBuffer, position);
+		if(readBytes != size) {
+			throw new StoreException("incorrect password data size from store path: "+storePath);
+		}
+		passwordsBuffer = passwordsBuffer.order(ByteOrder.BIG_ENDIAN).asReadOnlyBuffer();
+		passwordsBuffer.clear();
+
+		BinaryWebsite[] sortedView = this.sortedWebsitesBuffer;
 		int offset = 0;
-		for(Entry<Long, BinaryWebsite> websiteEntry : websiteIdMap.entrySet()) {
-			BinaryWebsite website = websiteEntry.getValue();
+		for(BinaryWebsite website : sortedView) {
 			if(website.offset() != offset) {
 				// password data placed order by website id asc in store file
 				throw new StoreException(String.format("incorrect password data order for website id=%d from store path: %s",
@@ -297,43 +377,38 @@ public class BinaryStoreDriver implements StoreDriver {
 		long websiteId = website.websiteId();
 		int count = website.count();
 		for(int i=0; i<count; i++) {
-			BinaryPassword password = BinaryPassword.load(passwordsBuffer, secretBlockSize);
+			BinaryPassword password = BinaryPassword.read(passwordsBuffer, secretBlockSize);
 			/* generally, one person who may not register multiple account on the same website,
 			 * so all the password data belong to the same website don't placed in order.
 			 */
 			if(password.websiteId() != websiteId) {
 				throw new StoreException(String.format("inconsistent website id=%d from store path: %s", websiteId, storePath));
 			}
-			if(!put(password)) {
+			if(!put(password, false)) {
 				throw new StoreException(String.format("conflict passwords with website id=%d from store path: %s",
 						websiteId, storePath));
 			}
 		}
 	}
 	
-	private boolean put(BinaryPassword password) {
-		long webisteId = password.websiteId();
-		String username = password.username();
-		PasswordKey passwordKey = new PasswordKey(webisteId, username);
-		BinaryPassword old = passwordMap.put(passwordKey, password);
-		if(old != null) {
-			passwordMap.put(passwordKey, old);
-			return false;
-		}
-		List<BinaryPassword> websiteIdPwdList = websiteIdPwdMap.get(webisteId);
-		if(websiteIdPwdList == null) {
-			websiteIdPwdList = new ArrayList<BinaryPassword>(3);
-			websiteIdPwdMap.put(webisteId, websiteIdPwdList);
-		}
-		websiteIdPwdList.add(password);
-		
-		List<BinaryPassword> usernamePwdList = usernamePwdMap.get(username);
-		if(usernamePwdList == null) {
-			usernamePwdList = new ArrayList<BinaryPassword>();
-			usernamePwdMap.put(username, usernamePwdList);
-		}
-		usernamePwdList.add(password);
-		return true;
+	private void initUndoAndRedoDeque() {
+		this.undoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
+		this.redoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
+	}
+	
+	private void initFlushIOBuffer() {
+		intBuffer = ByteBuffer.allocate(4);
+		longBuffer = ByteBuffer.allocate(8);
+		usernameBuffer = ByteBuffer.allocate(BinaryPassword.maxUsernameSize());
+		keywordBuffer = ByteBuffer.allocate(BinaryWebsite.keywordSize());
+		urlPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.urlPortionSize());
+		webPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.webPortionSize());
+		pwdPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.pwdPortionSize());
+		websiteBuffer = ByteBuffer.allocate(BinaryWebsite.occupiedSize());
+		keyValuePairBuffer = ByteBuffer.allocate(BinaryPassword.keyValuePairSize(secretBlockSize));
+		pwdPortionPasswordBuffer = ByteBuffer.allocate(BinaryPassword.pwdPortionSize(secretBlockSize));
+		pwdAndKvpPortionPasswordBuffer = ByteBuffer.allocate(BinaryPassword.pwdAndKvpPortionSize(secretBlockSize));
+		passwordBuffer = ByteBuffer.allocate(BinaryPassword.occupiedSize(secretBlockSize));
 	}
 	
 	/** release all resources **/
@@ -370,13 +445,12 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private boolean appendInsertOperation(BinaryWebsite newWebsite) {
-		if(!put(newWebsite)) { return false; }
-		websiteCount++;
+		if(!put(newWebsite, true)) { return false; }
 		undoQueue.offer(new ChangedOperation<BinaryWebsite>(null, OP.INSERT, newWebsite.copy()));
 		return true;
 	}
 	
-	private boolean put(BinaryWebsite newWebsite) {
+	private boolean put(BinaryWebsite newWebsite, boolean increaseCountIfSuccess) {
 		long websiteId = newWebsite.websiteId();
 		BinaryWebsite oldWebsite = websiteIdMap.put(websiteId, newWebsite);
 		if(oldWebsite != null) {
@@ -390,6 +464,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			websiteKeywordMap.put(keyword, oldWebsite);
 			return false;
 		}
+		if(increaseCountIfSuccess) { websiteCount++; }
 		return true;
 	}
 
@@ -399,7 +474,12 @@ public class BinaryStoreDriver implements StoreDriver {
 		if(!result.isSuccess()) {
 			return new Result<Website>(Code.FAIL, result.msg);
 		}
-		if(appendDeleteOperation(result.result)) {
+		BinaryWebsite biWebsite = result.result;
+		List<BinaryPassword> biPasswordList = websiteIdPwdMap.get(biWebsite.websiteId());
+		if(biPasswordList != null && !biPasswordList.isEmpty()) {
+			return new Result<Website>(Code.FAIL, "remained password list mapping with webiste id");
+		}
+		if(appendDeleteOperation(biWebsite)) {
 			return new Result<Website>(Code.SUCCESS, "success", website);
 		}else {
 			return new Result<Website>(Code.FAIL, "delete binary website internal error");
@@ -408,7 +488,6 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private boolean appendDeleteOperation(BinaryWebsite oldWebsite) {
 		if(!remove(oldWebsite)) { return false; }
-		websiteCount--;
 		undoQueue.offer(new ChangedOperation<BinaryWebsite>(oldWebsite.copy(), OP.DELETE, null));
 		return true;
 	}
@@ -428,6 +507,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			websiteIdMap.put(websiteId, one);
 			return false;
 		}
+		websiteCount--;
 		return true;
 	}
 
@@ -560,6 +640,14 @@ public class BinaryStoreDriver implements StoreDriver {
 		return new Result<BinaryWebsite>(Code.SUCCESS, "success", biWebsite);
 	}
 	
+	private Result<BinaryWebsite> selectBy(long websiteId) {
+		BinaryWebsite biWebsite = websiteIdMap.get(websiteId);
+		if(biWebsite == null) {
+			return new Result<BinaryWebsite>(Code.FAIL, "website mapping with id not found");
+		}
+		return new Result<BinaryWebsite>(Code.SUCCESS, "success", biWebsite);
+	}
+	
 	@Override
 	public Result<Integer> websiteCount() {
 		return new Result<Integer>(Code.SUCCESS, "success", websiteCount);
@@ -579,6 +667,10 @@ public class BinaryStoreDriver implements StoreDriver {
 	public Result<Password.Header> insertPassword(Password entry, CryptoKey encryptKey) {
 		BinaryPassword biPassword = null;
 		try {
+			Result<BinaryWebsite> biWebsiteResult = selectBy(entry.header().websiteId());
+			if(!biWebsiteResult.isSuccess()) {
+				return new Result<Password.Header>(Code.FAIL, biWebsiteResult.msg);
+			}
 			Result<BinaryPassword> biPasswordResult = selectBy(entry.header());
 			if(biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(Code.FAIL, "an existed entry mapping for this header");
@@ -621,9 +713,34 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private boolean appendInsertOperation(BinaryPassword password) {
-		if(!put(password)) { return false; }
-		passwordCount++;
+		if(!put(password, true)) { return false; }
 		undoQueue.offer(new ChangedOperation<BinaryPassword>(null, OP.INSERT, password.copy()));
+		return true;
+	}
+	
+	private boolean put(BinaryPassword password, boolean increaseCountIfSuccess) {
+		long webisteId = password.websiteId();
+		String username = password.username();
+		PasswordKey passwordKey = new PasswordKey(webisteId, username);
+		BinaryPassword old = passwordMap.put(passwordKey, password);
+		if(old != null) {
+			passwordMap.put(passwordKey, old);
+			return false;
+		}
+		List<BinaryPassword> websiteIdPwdList = websiteIdPwdMap.get(webisteId);
+		if(websiteIdPwdList == null) {
+			websiteIdPwdList = new ArrayList<BinaryPassword>(3);
+			websiteIdPwdMap.put(webisteId, websiteIdPwdList);
+		}
+		websiteIdPwdList.add(password);
+		
+		List<BinaryPassword> usernamePwdList = usernamePwdMap.get(username);
+		if(usernamePwdList == null) {
+			usernamePwdList = new ArrayList<BinaryPassword>();
+			usernamePwdMap.put(username, usernamePwdList);
+		}
+		usernamePwdList.add(password);
+		if(increaseCountIfSuccess) { passwordCount++; }
 		return true;
 	}
 
@@ -642,7 +759,6 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private boolean appendDeleteOperation(BinaryPassword password) {
 		if(!remove(password)) { return false; }
-		passwordCount--;
 		undoQueue.offer(new ChangedOperation<BinaryPassword>(password.copy(), OP.DELETE, null));
 		return true;
 	}
@@ -703,6 +819,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			usernamPasswords.add(another);
 			return false;
 		}
+		passwordCount--;
 		return true;
 	}
 
@@ -774,6 +891,19 @@ public class BinaryStoreDriver implements StoreDriver {
 		return decrypt(result.result, decryptKey);
 	}
 	
+	private Result<BinaryPassword> selectBy(Password.Header header) {
+		long websiteId = header.websiteId();
+		String username = header.username();
+		if(!header.hasId() || !header.hasUsername()) {
+			return new Result<BinaryPassword>(Code.FAIL, "password header without username and id");
+		}
+		
+		BinaryPassword biPassword = passwordMap.get(new PasswordKey(websiteId, username));
+		return biPassword == null ?
+				new Result<BinaryPassword>(Code.FAIL, "password mapping with username and id not found") :
+				new Result<BinaryPassword>(Code.SUCCESS, "success", biPassword);
+	}
+	
 	private Result<Password> decrypt(BinaryPassword biPassword, CryptoKey decryptKey) {
 		Password password = new Password(biPassword.websiteId(), biPassword.username());
 		
@@ -788,19 +918,6 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 		password.keyValuePairs(new String(decryptedResult.result, CHARSET));
 		return new Result<Password>(Code.SUCCESS, "success", password);
-	}
-	
-	private Result<BinaryPassword> selectBy(Password.Header header) {
-		long websiteId = header.websiteId();
-		String username = header.username();
-		if(!header.hasId() || !header.hasUsername()) {
-			return new Result<BinaryPassword>(Code.FAIL, "password header without username and id");
-		}
-		
-		BinaryPassword biPassword = passwordMap.get(new PasswordKey(websiteId, username));
-		return biPassword == null ?
-				new Result<BinaryPassword>(Code.FAIL, "password mapping with username and id not found") :
-				new Result<BinaryPassword>(Code.SUCCESS, "success", biPassword);
 	}
 	
 	@Override
@@ -926,9 +1043,9 @@ public class BinaryStoreDriver implements StoreDriver {
 		return new Result<Entity>(Code.SUCCESS, "success", entity);
 	}
 	
-	private boolean undoDeleteWebsite(BinaryWebsite biWebsite) { return put(biWebsite); }
+	private boolean undoDeleteWebsite(BinaryWebsite biWebsite) { return put(biWebsite.copy(), true); }
 	
-	private boolean undoDeletePassword(BinaryPassword biPassword) { return put(biPassword); }
+	private boolean undoDeletePassword(BinaryPassword biPassword) { return put(biPassword.copy(), true); }
 	
 	private Result<Entity> undoUpdate(ChangedOperation<? extends InternalEntity> last) {
 		InternalEntity before = last.before();
@@ -1005,9 +1122,9 @@ public class BinaryStoreDriver implements StoreDriver {
 		return new Result<Entity>(Code.SUCCESS, "success", entity);
 	}
 	
-	private boolean redoInsertWebsite(BinaryWebsite biWebsite) { return put(biWebsite); }
+	private boolean redoInsertWebsite(BinaryWebsite biWebsite) { return put(biWebsite.copy(), true); }
 	
-	private boolean redoInsertPassword(BinaryPassword biPassword) { return put(biPassword); }
+	private boolean redoInsertPassword(BinaryPassword biPassword) { return put(biPassword.copy(), true); }
 	
 	private Result<Entity> redoDelete(ChangedOperation<? extends InternalEntity> last) {
 		InternalEntity internalEntity = last.before();
@@ -1078,82 +1195,577 @@ public class BinaryStoreDriver implements StoreDriver {
 	@Override
 	public Result<Throwable> flush() {
 		ChangedOperation<? extends InternalEntity> first = null;
-		while((first = undoQueue.poll()) != null) {
-			OP op = first.op();
-			/*
-			 * for simplicity, flush changed operation sequentially.
-			 * to reduce the I/O operation, you can merge all changed operations
-			 * of the same entry first, and then flush to underlying storage. 
-			 */
-			switch(op) {
-			case INSERT:
-				InternalEntity inserted = first.after();
-				try {
-					if(inserted.type() == Type.WEBSITE) {
-						flushInsertWebsite((BinaryWebsite) inserted);
-					}else {
-						flushInsertPassword((BinaryPassword) inserted);
+		int toBeFlushedCount = undoQueue.size();
+		try {
+			while((first = undoQueue.poll()) != null) {
+				OP op = first.op();
+				/*
+				 * for simplicity, flush changed operation sequentially.
+				 * to reduce the I/O operation, you can merge all changed operations
+				 * of the same entry first, and then flush to underlying storage. 
+				 */
+				switch(op) {
+				case INSERT:
+					InternalEntity inserted = first.after();
+					try {
+						if(inserted.type() == Type.WEBSITE) {
+							writeInsertWebsite((BinaryWebsite) inserted);
+						}else {
+							writeInsertPassword((BinaryPassword) inserted);
+						}
+					}catch(Exception e) {
+						return new Result<Throwable>(Code.FAIL, "flush insert internal error", e);
 					}
-				}catch(Exception e) {
-					return new Result<Throwable>(Code.FAIL, "flush insert internal error", e);
-				}
-				break;
-			case DELETE:
-				InternalEntity deleted = first.before();
-				try {
-					if(deleted.type() == Type.WEBSITE) {
-						flushDeleteWebsite((BinaryWebsite) deleted);
-					}else {
-						flushDeletePassword((BinaryPassword) deleted);
+					break;
+				case DELETE:
+					InternalEntity deleted = first.before();
+					try {
+						if(deleted.type() == Type.WEBSITE) {
+							writeDeleteWebsite((BinaryWebsite) deleted);
+						}else {
+							writeDeletePassword((BinaryPassword) deleted);
+						}
+					}catch(Exception e) {
+						return new Result<Throwable>(Code.FAIL, "flush delete internal error", e);
 					}
-				}catch(Exception e) {
-					return new Result<Throwable>(Code.FAIL, "flush delete internal error", e);
-				}
-				break;
-			case UPDATE:
-				InternalEntity before = first.before();
-				InternalEntity after = first.after();
-				try {
-					if(before.type() == Type.WEBSITE) {
-						flushUpdateWebsite((BinaryWebsite) before, (BinaryWebsite) after);
-					}else {
-						flushUpdatePassword((BinaryPassword) before, (BinaryPassword) after);
+					break;
+				case UPDATE:
+					InternalEntity before = first.before();
+					InternalEntity after = first.after();
+					try {
+						if(before.type() == Type.WEBSITE) {
+							writeUpdateWebsite((BinaryWebsite) before, (BinaryWebsite) after);
+						}else {
+							writeUpdatePassword((BinaryPassword) before, (BinaryPassword) after);
+						}
+					}catch(Exception e) {
+						return new Result<Throwable>(Code.FAIL, "flush update internal error", e);
 					}
-				}catch(Exception e) {
-					return new Result<Throwable>(Code.FAIL, "flush update internal error", e);
+					break;
+				default:
+					undoQueue.offerFirst(first);
+					return new Result<Throwable>(Code.FAIL, "unsupported op type of flush operation: "+op);
 				}
-				break;
-			default:
-				undoQueue.offerFirst(first);
-				return new Result<Throwable>(Code.FAIL, "unsupported op type of flush operation: "+op);
+			}
+			return new Result<Throwable>(Code.SUCCESS, "success");
+		}finally {
+			try {
+				if(undoQueue.size() < toBeFlushedCount) { flushChanged(); }
+			}catch(IOException e) {
+				return new Result<Throwable>(Code.FAIL, "failed to force flush changed to store path: "+storePath, e);
 			}
 		}
-		return new Result<Throwable>(Code.SUCCESS, "success");
 	}
 	
-	private void flushInsertWebsite(BinaryWebsite target) {
-		
+	private void writeInsertWebsite(BinaryWebsite target) {
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		long targetWebsiteId = target.websiteId();
+		int actualCount = readWebsiteCount();
+		int offsetCount = actualCount == 0 ? 0 : findInsertIndex(targetWebsiteId, array, 0, actualCount-1);
+
+		long position = readWebsiteOffset();
+		int size = BinaryWebsite.occupiedSize();
+		try {
+			// validateWebsiteInsertOffset(targetWebsiteId, position, size, actualCount, offsetCount);
+			long insertingPosition = position + offsetCount * size;
+			ByteBuffer buf = websiteBuffer;
+			buf.clear();
+			BinaryWebsite.write(buf, target);
+			buf.flip();
+			expandAndFill(insertingPosition, buf, size);
+			addToSortedWebsitesBuffer(target, offsetCount, actualCount);
+			writeWebsiteCount(actualCount + 1);
+		}catch(IOException e) {
+			throw new StoreException(String.format("failed to insert website with id=%d to store path: %s",
+					targetWebsiteId, storePath), e);
+		}
 	}
 	
-	private void flushInsertPassword(BinaryPassword target) {
-		
+	@SuppressWarnings("unused")
+	private void validateWebsiteInsertOffset(long targetWebsiteId, long position,
+			int size, int actualCount, int offsetCount) throws IOException {
+		if(actualCount == 0) {
+			if(offsetCount != 0) {
+				throw new StoreException(String.format("incorrect insert offset=%d for website with id=%d from store path: %s",
+						offsetCount, targetWebsiteId, storePath));
+			}
+			return;
+		}
+		ByteBuffer buf = longBuffer.order(ByteOrder.BIG_ENDIAN);
+		int length = buf.capacity();
+		if(offsetCount == 0) { // first
+			buf.clear();
+			int readBytes = storeChannel.read(buf, position);
+			if(readBytes != length) {
+				throw new StoreException("failed to read website id from store path: "+storePath);
+			}
+			buf.flip();
+			if(targetWebsiteId > buf.getLong()) {
+				throw new StoreException(String.format("incorrect insert offset=%d for website with id=%d from store path: %s",
+						offsetCount, targetWebsiteId, storePath));
+			}
+		}else if(offsetCount == actualCount) { // end
+			buf.clear();
+			int readBytes = storeChannel.read(buf, position+(offsetCount-1)*size);
+			if(readBytes != length) {
+				throw new StoreException("failed to read website id from store path: "+storePath);
+			}
+			buf.flip();
+			if(targetWebsiteId < buf.getLong()) {
+				throw new StoreException(String.format("incorrect insert offset=%d for website with id=%d from store path: %s",
+						offsetCount, targetWebsiteId, storePath));
+			}
+		}else {
+			buf.clear();
+			int readBytes = storeChannel.read(buf, position+offsetCount*size);
+			if(readBytes != length) {
+				throw new StoreException("failed to read website id from store path: "+storePath);
+			}
+			buf.flip();
+			if(targetWebsiteId > buf.getLong()) {
+				throw new StoreException(String.format("incorrect insert offset=%d for website with id=%d from store path: %s",
+						offsetCount, targetWebsiteId, storePath));
+			}
+			buf.clear();
+			readBytes = storeChannel.read(buf, position+(offsetCount-1)*size);
+			if(readBytes != length) {
+				throw new StoreException("failed to read website id from store path: "+storePath);
+			}
+			buf.flip();
+			if(targetWebsiteId < buf.getLong()) {
+				throw new StoreException(String.format("incorrect insert offset=%d for website with id=%d from store path: %s",
+						offsetCount, targetWebsiteId, storePath));
+			}
+		}
 	}
 	
-	private void flushDeleteWebsite(BinaryWebsite target) {
-		
+	private void expandAndFill(long position, ByteBuffer buf, int increamentSize) throws IOException {
+		long fileSize = storeChannel.size();
+		long movedBytes = fileSize - position;
+		storeChannel.truncate(fileSize + increamentSize);
+		if(movedBytes > 0) {
+			storeChannel.position(position);
+			long transferredBytes = storeChannel.transferFrom(storeChannel, position+increamentSize, movedBytes);
+			if(transferredBytes != movedBytes) {
+				throw new StoreException(String.format("for expand, failed to transfer %d bytes starting at %d to store path: %s",
+						movedBytes, position, storePath));
+			}
+		}
+		int writeBytes = storeChannel.write(buf, position);
+		if(writeBytes != increamentSize) {
+			throw new StoreException(String.format("failed to write %d bytes starting at %d to store path: %s",
+					increamentSize, position, storePath));
+		}
+	}
+
+	private int readPasswordCount() { return readIntFromMetadataBuffer(0); }
+	private long readPasswordOffset() { return readLongFromMetadataBuffer(4); }
+	private int readWebsiteCount() { return readIntFromMetadataBuffer(12); }
+	private long readWebsiteOffset() { return readLongFromMetadataBuffer(16); }
+	
+	private int readIntFromMetadataBuffer(int offset) {
+		ByteBuffer buf = metadataBuffer;
+		buf.clear();
+		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		return buf.getInt();
 	}
 	
-	private void flushDeletePassword(BinaryPassword target) {
-		
+	private long readLongFromMetadataBuffer(int offset) {
+		ByteBuffer buf = metadataBuffer;
+		buf.clear();
+		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		return buf.getLong();
 	}
 	
-	private void flushUpdateWebsite(BinaryWebsite oldWebsite, BinaryWebsite newWebsite) {
+	private void writePasswordCount(int passwordCount) { writeIntToMetadataBuffer(0, passwordCount); }
+	@SuppressWarnings("unused")
+	private void writePasswordOffset(long passwordOffset) { writeLongToMetadataBuffer(4, passwordOffset); }
+	private void writeWebsiteCount(int websiteCount) { writeIntToMetadataBuffer(12, websiteCount); }
+	private void writeWebsiteOffset(long websiteOffset) { writeLongToMetadataBuffer(16, websiteOffset); }
+	
+	private void writeIntToMetadataBuffer(int offset, int value) {
+		ByteBuffer buf = metadataBuffer;
+		buf.clear();
+		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		buf.putInt(value);
 		
+		writeInt(MAGIC.length + offset, value);
 	}
 	
-	private void flushUpdatePassword(BinaryPassword oldPassword, BinaryPassword newPassword) {
-		
+	private void writeInt(long position, int value) {
+		ByteBuffer buf = intBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		buf.putInt(value);
+		buf.flip();
+		write(buf, position);
 	}
+	
+	private void write(ByteBuffer buf, long position) {
+		int length = buf.capacity();
+		try {
+			if(storeChannel.write(buf, position) != length) {
+				throw new StoreException(String.format("failed to write %d bytes at position %d to store path: %s",
+						length, position, storePath));
+			}
+		}catch(IOException e) {
+			throw new StoreException(String.format("failed to write %d bytes at position %d to store path: %s",
+					length, position, storePath), e);
+		}
+	}
+	
+	private void writeLongToMetadataBuffer(int offset, long value) {
+		ByteBuffer buf = metadataBuffer;
+		buf.clear();
+		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		buf.putLong(value);
+		
+		writeLong(MAGIC.length + offset, value);
+	}
+	
+	private void writeLong(long position, long value) {
+		ByteBuffer buf = longBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		buf.putLong(value);
+		buf.flip();
+		write(buf, position);
+	}
+	
+	private void writeInsertPassword(BinaryPassword target) {
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		long targetWebsiteId = target.websiteId();
+		int actualWebsiteCount = readWebsiteCount();
+		long position = readPasswordOffset();
+		int actualCount = readPasswordCount();
+		int size = BinaryPassword.occupiedSize(secretBlockSize);
+		ByteBuffer buf = passwordBuffer;
+		buf.clear();
+		BinaryPassword.write(buf, secretBlockSize, target);
+		buf.flip();
+
+		try {
+			int curIndex = findExactIndex(targetWebsiteId, array, 0, actualWebsiteCount-1);
+			if(curIndex == -1) {
+				throw new StoreException(String.format("while insert password, failed to find website with id=%d from store path: %s",
+						targetWebsiteId, storePath));
+			}
+			BinaryWebsite existedWebsite = array[curIndex];
+			long insertingPosition = position;
+			if(actualCount > 0) {
+				if(existedWebsite.isValidOffset()) {
+					insertingPosition += existedWebsite.offset();
+					insertingPosition += existedWebsite.count()*size;
+				}else {
+					int prevIndex = -1;
+					for(int i=curIndex-1; i>=0; i--) {
+						if(array[i].isValidOffset()) {
+							prevIndex = i;
+							break;
+						}
+					}
+					if(prevIndex != -1) {
+						BinaryWebsite prevWebsite = array[prevIndex];
+						insertingPosition += prevWebsite.offset();
+						insertingPosition += prevWebsite.count()*size;
+					}
+				}
+			}
+			expandAndFill(insertingPosition, buf, size);
+			writePasswordCount(actualCount+1);
+			writeWebsiteOffset(readWebsiteOffset()+size);
+			writeCurrentPwdCountAndOffset(curIndex, array, insertingPosition-position, 1);
+			writeSucceedingOffsets(array, curIndex+1, actualWebsiteCount, size);
+		}catch(IOException e) {
+			throw new StoreException(String.format("failed to insert password with website id=%d and username=%s from store path: %s",
+					targetWebsiteId, target.username(), storePath), e);
+		}
+	}
+	
+	/**
+	 * return the exact index of {@code targetWebsiteId}, if it is contained in the {@code array}
+	 * within the specified range {@code [begin, end]}; otherwise {@code -1} **/
+	private int findExactIndex(long targetWebsiteId, BinaryWebsite[] array, int begin, int end) {
+		int index = -1;
+		while(begin <= end) {
+			int mid = (begin + end) / 2;
+			long websiteId = array[mid].websiteId();
+			if(targetWebsiteId == websiteId) {
+				index = mid;
+				break;
+			}else if(targetWebsiteId < websiteId) {
+				end = mid -1;
+			}else {
+				begin = mid + 1;
+			}
+		}
+		return index;
+	}
+	
+	private void writeCurrentPwdCountAndOffset(int curIndex, BinaryWebsite[] array, long newOffset, int deltaCount) throws IOException {
+		// update password count and password entries offset of current website
+		long websiteOffset = readWebsiteOffset();
+		int size = BinaryWebsite.occupiedSize();
+		long position = websiteOffset + curIndex * size;
+		BinaryWebsite website = array[curIndex];
+		website.incrementCount(deltaCount);
+		website.timestamp(System.currentTimeMillis());
+		if(!website.isValidOffset()) { website.offset(newOffset); }
+		writePwdPortionOfWebsite(position, website);
+	}
+	
+	private void writePwdPortionOfWebsite(long websitePosition, BinaryWebsite website) {
+		long position = BinaryWebsite.pwdPortionPosition(websitePosition);
+		ByteBuffer buf = pwdPortionWebsiteBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryWebsite.writePwdPortion(buf, website);
+		buf.flip();
+		write(buf, position);
+	}
+	
+	private void writeSucceedingOffsets(BinaryWebsite[] array, int firstIndex, int totalCount,
+			int deltaOffset) throws IOException {
+		// update password offset of succeeding websites
+		long websiteOffset = readWebsiteOffset();
+		int size = BinaryWebsite.occupiedSize();
+		for(int i=firstIndex; i<totalCount; i++) {
+			BinaryWebsite website = array[i];
+			if(website.isValidOffset()) {
+				website.incrementOffset(deltaOffset);
+				long position = websiteOffset + i * size;
+				writePasswordOffsetOfWebsite(position, website.offset());
+			}
+		}
+	}
+	
+	private void writePasswordOffsetOfWebsite(long websitePosition, long newOffset) throws IOException {
+		long position = BinaryWebsite.offsetPosition(websitePosition);
+		writeLong(position, newOffset);
+	}
+	
+	private void writeDeleteWebsite(BinaryWebsite target) {
+		long targetWebsiteId = target.websiteId();
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		int actualCount = readWebsiteCount();
+		int removingIndex = findExactIndex(targetWebsiteId, array, 0, actualCount-1);
+		if(removingIndex == -1) {
+			throw new StoreException(String.format("while delete website, website with id=%d not found in store path: %s",
+					targetWebsiteId, storePath));
+		}
+		
+		try {
+			long position = readWebsiteOffset();
+			int size = BinaryWebsite.occupiedSize();
+			position += removingIndex * size;
+			truncate(position, size);
+			
+			// check website count equal 0 or not
+			System.arraycopy(array, removingIndex+1, array, removingIndex, actualCount - removingIndex - 1);
+			array[actualCount-1] = null;
+			
+			writeWebsiteCount(actualCount-1);
+		}catch(IOException e) {
+			throw new StoreException(String.format("failed to delete website with id=%d from store path: %s",
+					targetWebsiteId, storePath), e);
+		}
+	}
+	
+	private void truncate(long position, int decreamentSize) throws IOException {
+		long fileSize = storeChannel.size();
+		long nextPosition = position + decreamentSize;
+		long movedBytes = fileSize - nextPosition;
+		if(movedBytes > 0) {
+			storeChannel.position(nextPosition);
+			long transferredBytes = storeChannel.transferFrom(storeChannel, position, movedBytes);
+			if(transferredBytes != movedBytes) {
+				throw new StoreException(String.format("for truncate, failed to transfer %d bytes starting at %d to store path: %s",
+						movedBytes, nextPosition, storePath));
+			}
+		}
+		storeChannel.truncate(fileSize - decreamentSize);
+	}
+	
+	private void writeDeletePassword(BinaryPassword target) {
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		int actualWebsiteCount = readWebsiteCount();
+		long position = readPasswordOffset();
+		int actualCount = readPasswordCount();
+		long targetWebsiteId = target.websiteId();
+		int size = BinaryPassword.occupiedSize(secretBlockSize);
+		
+		try {
+			int curIndex = findExactIndex(targetWebsiteId, array, 0, actualWebsiteCount-1);
+			if(curIndex == -1) {
+				throw new StoreException(String.format("while delete password, failed to find website with id=%d from store path: %s",
+						targetWebsiteId, storePath));
+			}
+			BinaryWebsite existedWebsite = array[curIndex];
+			
+			long deletingPosition = position + existedWebsite.offset();
+			int passwordCount = existedWebsite.count();
+			deletingPosition = findPasswordPostion(deletingPosition, passwordCount, size, target);
+			if(deletingPosition == -1) {
+				throw new StoreException(String.format("while delete password, failed to find password with id=%d and username=%s from store path: %s",
+						targetWebsiteId, target.username(), storePath));
+			}
+			truncate(deletingPosition, size);
+			writePasswordCount(actualCount-1);
+			writeWebsiteOffset(readWebsiteOffset()-size);
+			writeCurrentPwdCountAndOffset(curIndex, array, existedWebsite.offset(), -1);
+			writeSucceedingOffsets(array, curIndex+1, actualWebsiteCount, -size);
+		}catch(IOException e) {
+			throw new StoreException(String.format("failed to delete password with website id=%d and username=%s from store path: %s",
+					targetWebsiteId, target.username(), storePath), e);
+		}
+	}
+	
+	/** return the position of target password if it exists, otherwise -1 **/
+	private long findPasswordPostion(long startPosition, int passwordCount, int passwordSize,
+			BinaryPassword targetPassword) throws IOException {
+		ByteBuffer buf = usernameBuffer.order(ByteOrder.BIG_ENDIAN);
+		long position = startPosition;
+		for(int i=0; i<passwordCount; i++) {
+			buf.clear();
+			storeChannel.read(buf, BinaryPassword.usernamePosition(position));
+			buf.flip();
+			if(BinaryPassword.hasEqualUsername(targetPassword, buf)) {
+				return position;
+			}
+			position += passwordSize;
+		}
+		return -1;
+	}
+	
+	private void writeUpdateWebsite(BinaryWebsite oldWebsite, BinaryWebsite newWebsite) {
+		long targetWebsiteId = newWebsite.websiteId();
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		int actualCount = readWebsiteCount();
+		int index = findExactIndex(targetWebsiteId, array, 0, actualCount-1);
+		if(index == -1) {
+			throw new StoreException(String.format("while update website, website with id=%d not found in store path: %s",
+					targetWebsiteId, storePath));
+		}
+		
+		try {
+			BinaryWebsite biWebsite = array[index];
+			long position = readWebsiteOffset();
+			int size = BinaryWebsite.occupiedSize();
+			position += index * size;
+			if(newWebsite.isKeywordChanged()) {
+				if(newWebsite.isUrlChanged()) {
+					writeKeywordAndUrl(position, newWebsite);
+					biWebsite.pasteUrl(newWebsite);
+				}else {
+					writeKeyword(position, newWebsite);
+				}
+				biWebsite.pasteKeyword(newWebsite);
+			}else {
+				if(newWebsite.isUrlChanged()) {
+					writeUrl(position, newWebsite);
+					biWebsite.pasteUrl(newWebsite);
+				}else {
+					throw new StoreException(String.format("while update website, no changed found for website id=%d in store path: %s",
+							targetWebsiteId, storePath));
+				}
+			}
+		}catch(StoreException e) {
+			throw e;
+		}catch(Exception e) {
+			throw new StoreException(String.format("failed to update website with id=%d to store path: %s",
+					targetWebsiteId, storePath), e);
+		}
+	}
+	
+	private void writeKeywordAndUrl(long websitePosition, BinaryWebsite newWebsite) {
+		ByteBuffer buf = webPortionWebsiteBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryWebsite.writeWebPortion(buf, newWebsite);
+		buf.flip();
+		write(buf, BinaryWebsite.webPortionPosition(websitePosition));
+	}
+	
+	private void writeKeyword(long websitePosition, BinaryWebsite newWebsite) {
+		ByteBuffer buf = keywordBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryWebsite.writeKeyword(buf, newWebsite);
+		buf.flip();
+		write(buf, BinaryWebsite.keywordPosition(websitePosition));
+		writeLong(BinaryWebsite.timestampPosition(websitePosition), newWebsite.timestamp());
+	}
+	
+	private void writeUrl(long websitePosition, BinaryWebsite newWebsite) {
+		ByteBuffer buf = urlPortionWebsiteBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryWebsite.writeUrlPortion(buf, newWebsite);
+		buf.flip();
+		write(buf, BinaryWebsite.urlPortionPosition(websitePosition));
+	}
+	
+	private void writeUpdatePassword(BinaryPassword oldPassword, BinaryPassword newPassword) {
+		BinaryWebsite[] array = sortedWebsitesBuffer;
+		int actualWebsiteCount = readWebsiteCount();
+		long position = readPasswordOffset();
+		long targetWebsiteId = oldPassword.websiteId();
+		int size = BinaryPassword.occupiedSize(secretBlockSize);
+		
+		try {
+			int curIndex = findExactIndex(targetWebsiteId, array, 0, actualWebsiteCount-1);
+			if(curIndex == -1) {
+				throw new StoreException(String.format("while update password, failed to find website with id=%d from store path: %s",
+						targetWebsiteId, storePath));
+			}
+			BinaryWebsite existedWebsite = array[curIndex];
+			long updatingPosition = position + existedWebsite.offset();
+			int passwordCount = existedWebsite.count();
+			updatingPosition = findPasswordPostion(updatingPosition, passwordCount, size, oldPassword);
+			if(updatingPosition == -1) {
+				throw new StoreException(String.format("while update password, failed to find password with id=%d and username=%s from store path: %s",
+						targetWebsiteId, oldPassword.username(), storePath));
+			}
+			if(newPassword.isEncryptedPasswordChanged()) {
+				if(newPassword.isEncryptedKeyValuePairsChanged()) {
+					writePwdAndKvp(updatingPosition, newPassword);
+				}else {
+					writePwd(updatingPosition, newPassword);
+				}
+			}else {
+				if(newPassword.isEncryptedKeyValuePairsChanged()) {
+					writeKvp(updatingPosition, newPassword);
+				}else {
+					throw new StoreException(String.format("while update password, no changed found for password with"
+							+ "website id=%d and username=%s in store path: %s",
+							targetWebsiteId, oldPassword.username(), storePath));
+				}
+			}
+		}catch(IOException e) {
+			throw new StoreException(String.format("failed to update password with webiste id=%d and username=%s to store path: %s",
+					targetWebsiteId, oldPassword.username(), storePath), e);
+		}
+	}
+	
+	private void writePwdAndKvp(long startPosition, BinaryPassword newPassword) {
+		ByteBuffer buf = pwdAndKvpPortionPasswordBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryPassword.writePwdAndKvpPortion(buf, secretBlockSize, newPassword);
+		buf.flip();
+		write(buf, BinaryPassword.pwdAndKvpPortionPosition(startPosition));
+	}
+	
+	private void writePwd(long startPosition, BinaryPassword newPassword) {
+		ByteBuffer buf = pwdPortionPasswordBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryPassword.writePwdPortion(buf, secretBlockSize, newPassword);
+		buf.flip();
+		write(buf, BinaryPassword.pwdPortionPosition(startPosition));
+	}
+	
+	private void writeKvp(long startPosition, BinaryPassword newPassword) {
+		ByteBuffer buf = keyValuePairBuffer.order(ByteOrder.BIG_ENDIAN);
+		buf.clear();
+		BinaryPassword.writeKeyValuePair(buf, secretBlockSize, newPassword);
+		buf.flip();
+		write(buf, BinaryPassword.keyValuePairPosition(startPosition, secretBlockSize));
+	}
+	
+	private void flushChanged() throws IOException { storeChannel.force(true); }
 
 	@Override
 	public Result<Throwable> close() {

@@ -11,13 +11,18 @@ import com.lee.password.keeper.impl.util.Base64Variants;
 
 public class BinaryPassword implements InternalEntity {
 
+	private static final int USER_NAME_LEN_SIZE = 1;
+	private static final int SECRET_LEN_SIZE = 2;
 	private static final int MAX_USER_NAME_LEN = 48;	// 48 bytes
-	public static final long FIXED_OCCUPIED_BYTES =
-			8	// websiteId
-			+ 1 + MAX_USER_NAME_LEN	// username (size + data)
+	private static final int USER_NAME_OFFSET = 8;		// websiteId
+	private static final int TIMESTAMP_OFFSET =
+			USER_NAME_OFFSET
+			+ USER_NAME_LEN_SIZE + MAX_USER_NAME_LEN;	// username (size + data)
+	private static final int FIXED_OCCUPIED_BYTES =
+			TIMESTAMP_OFFSET
 			+ 8	// timestamp
-			+ 2 + 0	// encryptedPassword (size + data)
-			+ 2 + 0;	// encryptedKeyValuePairs (size + data)
+			+ SECRET_LEN_SIZE + 0	// encryptedPassword (size + data)
+			+ SECRET_LEN_SIZE + 0;	// encryptedKeyValuePairs (size + data)
 	
 	private final long websiteId;
 	private final byte[] username;
@@ -35,9 +40,20 @@ public class BinaryPassword implements InternalEntity {
 	private static final int ENCRYPT_KVP_CHANGED_MASK = 0x02;
 	
 	/** return the bytes of this object occupied in store file **/
-	public static long occupiedSize(int secretBlockSize) { return FIXED_OCCUPIED_BYTES + secretBlockSize * 2; }
+	public static int occupiedSize(int secretBlockSize) { return FIXED_OCCUPIED_BYTES + secretBlockSize * 2; }
+	/** return the max username size(size + data length) **/
+	public static int maxUsernameSize() { return 1 + MAX_USER_NAME_LEN; }
+	public static long usernamePosition(long passwordPosition) { return passwordPosition + USER_NAME_OFFSET; }
+	public static int pwdPortionSize(int secretBlockSize) { return 8 + SECRET_LEN_SIZE + secretBlockSize; }
+	public static long pwdPortionPosition(long passwordPosition) { return passwordPosition + TIMESTAMP_OFFSET; }
+	public static int pwdAndKvpPortionSize(int secretBlockSize) { return 8 + 2 * (SECRET_LEN_SIZE + secretBlockSize); }
+	public static long pwdAndKvpPortionPosition(long passwordPosition) { return passwordPosition + TIMESTAMP_OFFSET; }
+	public static int keyValuePairSize(int secretBlockSize) { return SECRET_LEN_SIZE + secretBlockSize; }
+	public static long keyValuePairPosition(long passwordPosition, int secretBlockSize) {
+		return passwordPosition + occupiedSize(secretBlockSize) - keyValuePairSize(secretBlockSize);
+	}
 	
-	public static BinaryPassword load(ByteBuffer buffer, int secretBlockSize) {
+	public static BinaryPassword read(ByteBuffer buffer, int secretBlockSize) {
 		long websiteId = buffer.getLong();
 		int len = 0xff & buffer.get();
 		byte[] username = new byte[len];
@@ -55,6 +71,65 @@ public class BinaryPassword implements InternalEntity {
 		password.encryptedPassword(encryptedPassword);
 		password.encryptedKeyValuePairs(encryptedKeyValuePairs);
 		return password;
+	}
+	
+	public static void write(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
+		buffer.putLong(target.websiteId);
+		int len = target.username.length;
+		buffer.put((byte)len);
+		buffer.put(target.username);
+		buffer.position(buffer.position() + (MAX_USER_NAME_LEN - len)); // skip remaining bytes with username slot
+		buffer.putLong(target.timestamp);
+		len = target.encryptedPassword.length;
+		buffer.putShort((short)len);
+		buffer.put(target.encryptedPassword);
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+		len = target.encryptedKeyValuePairs.length;
+		buffer.putShort((short)len);
+		if(len > 0) { buffer.put(target.encryptedKeyValuePairs); }
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted kvp slot
+	}
+	
+	public static void writePwdPortion(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
+		buffer.putLong(target.timestamp);
+		int len = target.encryptedPassword.length;
+		buffer.putShort((short)len);
+		buffer.put(target.encryptedPassword);
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+	}
+	
+	public static void writePwdAndKvpPortion(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
+		buffer.putLong(target.timestamp);
+		int len = target.encryptedPassword.length;
+		buffer.putShort((short)len);
+		buffer.put(target.encryptedPassword);
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+		len = target.encryptedKeyValuePairs.length;
+		buffer.putShort((short)len);
+		if(len > 0) { buffer.put(target.encryptedKeyValuePairs); }
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted kvp slot
+	}
+	
+	public static void writeKeyValuePair(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
+		int len = target.encryptedKeyValuePairs.length;
+		buffer.putShort((short)len);
+		if(len > 0) { buffer.put(target.encryptedKeyValuePairs); }
+		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted kvp slot
+	}
+	
+	public static boolean hasEqualUsername(BinaryPassword one, ByteBuffer usernameBuf) {
+		int length = one.username.length;
+		if(usernameBuf.remaining() <= length) { return false; }
+		int len = usernameBuf.get();
+		if(len != length) { return false; }
+		return byteCompare(one.username, usernameBuf);
+	}
+	
+	private static boolean byteCompare(byte[] one, ByteBuffer usernameBuf) {
+		for(int i=0; i<one.length; i++) {
+			if(one[i] != usernameBuf.get()) { return false; }
+		}
+		return true;
 	}
 	
 	public static boolean hasEqualUsername(BinaryPassword one, BinaryPassword another) {
