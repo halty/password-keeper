@@ -2,13 +2,7 @@ package com.lee.password.keeper.impl.store;
 
 import static com.lee.password.keeper.api.store.Password.CHARSET;
 
-import java.io.BufferedInputStream;
-import java.io.BufferedOutputStream;
-import java.io.DataInputStream;
-import java.io.DataOutputStream;
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.nio.ByteBuffer;
@@ -166,34 +160,26 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	/** init an data file with metadata **/
 	private void initStore() throws Exception {
-		FileOutputStream fos = null;
-		DataOutputStream dos = null;
-		try {
-			long offset = MAGIC.length + META_DATA_LEN;
-			this.passwordCount = 0;
-			this.passwordOffset = offset;
-			this.websiteCount = 0;
-			this.websiteOffset = offset;
-			this.metadataBuffer = initMetaBuffer(passwordCount, passwordOffset, websiteCount, websiteOffset);
-			metadataBuffer.clear();
-			fos = new FileOutputStream(storePath);
-			dos = new DataOutputStream(new BufferedOutputStream(fos));
-			dos.write(MAGIC);
-			dos.write(metadataBuffer.array());
-			dos.flush();
-			
-			this.passwordMap = new HashMap<PasswordKey, BinaryPassword>();
-			this.websiteIdPwdMap = new HashMap<Long, List<BinaryPassword>>();
-			this.usernamePwdMap = new HashMap<String, List<BinaryPassword>>();
-			this.websiteIdMap = new HashMap<Long, BinaryWebsite>();
-			this.websiteKeywordMap = new HashMap<String, BinaryWebsite>();
-			this.sortedWebsitesBuffer = new BinaryWebsite[10];
-		}finally {
-			try {
-				if(dos != null) { dos.close(); }
-				if(fos != null) { fos.close(); }
-			}catch(Exception e) {/** can't do anything **/ throw e; }
-		}
+		long offset = MAGIC.length + META_DATA_LEN;
+		this.passwordCount = 0;
+		this.passwordOffset = offset;
+		this.websiteCount = 0;
+		this.websiteOffset = offset;
+		this.metadataBuffer = initMetaBuffer(passwordCount, passwordOffset, websiteCount, websiteOffset);
+		metadataBuffer.clear();
+		
+		storeChannel.truncate(offset);
+		storeChannel.position(0);
+		storeChannel.write(ByteBuffer.wrap(MAGIC));
+		storeChannel.write(metadataBuffer);
+		storeChannel.force(true);
+		
+		this.passwordMap = new HashMap<PasswordKey, BinaryPassword>();
+		this.websiteIdPwdMap = new HashMap<Long, List<BinaryPassword>>();
+		this.usernamePwdMap = new HashMap<String, List<BinaryPassword>>();
+		this.websiteIdMap = new HashMap<Long, BinaryWebsite>();
+		this.websiteKeywordMap = new HashMap<String, BinaryWebsite>();
+		this.sortedWebsitesBuffer = new BinaryWebsite[10];
 	}
 	
 	private ByteBuffer initMetaBuffer(int passwordCount, long passwordOffset, int websiteCount, long websiteOffset) {
@@ -207,31 +193,16 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	/** load all the data from file to memory **/
 	private void loadStore() throws Exception {
-		matchMagicAndLoadMetadata();
+		matchMagic();
+		loadMetadata();
 		loadWebsites();
 		loadPasswords();
 	}
 	
-	private void matchMagicAndLoadMetadata() throws Exception {
-		FileInputStream fis = null;
-		DataInputStream dis = null;
-		try {
-			fis = new FileInputStream(storePath);
-			dis = new DataInputStream(new BufferedInputStream(fis));
-			matchMagic(dis);
-			loadMetadata(dis);
-		}finally {
-			try {
-				if(dis != null) { dis.close(); }
-				if(fis != null) { fis.close(); }
-			}catch(Exception e) {/** can't do anything **/ throw e; }
-		}
-	}
-	
-	private void matchMagic(DataInputStream dis) throws IOException {
+	private void matchMagic() throws IOException {
 		int expectedLen = MAGIC.length;
 		byte[] magic = new byte[expectedLen];
-		int len = dis.read(magic);
+		int len = storeChannel.read(ByteBuffer.wrap(magic), 0);
 		if(len != expectedLen) {
 			throw new StoreException("incorrect magic number size from store path: "+storePath);
 		}
@@ -240,11 +211,15 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 	}
 	
-	private void loadMetadata(DataInputStream dis) {
+	private void loadMetadata() {
 		try {
-			byte[] bytes = new byte[META_DATA_LEN];
-			dis.readFully(bytes);
-			this.metadataBuffer = ByteBuffer.wrap(bytes).order(ByteOrder.BIG_ENDIAN);
+			this.metadataBuffer = ByteBuffer.allocate(META_DATA_LEN).order(ByteOrder.BIG_ENDIAN);
+			metadataBuffer.clear();
+			int len = storeChannel.read(metadataBuffer, MAGIC.length);
+			if(len != META_DATA_LEN) {
+				throw new StoreException("incorrect metadata size from store path: "+storePath);
+			}
+			metadataBuffer.flip();
 			this.passwordCount = metadataBuffer.getInt();
 			this.passwordOffset = metadataBuffer.getLong();
 			this.websiteCount = metadataBuffer.getInt();
@@ -422,6 +397,9 @@ public class BinaryStoreDriver implements StoreDriver {
 			throw new StoreException("failed to release resoures of "+storePath, e);
 		}
 	}
+	
+	@Override
+	public Result<String> storePath() { return new Result<String>(Code.SUCCESS, "success", storePath.getAbsolutePath()); }
 	
 	@Override
 	public Result<Website> insertWebsite(Website website) {

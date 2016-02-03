@@ -7,6 +7,9 @@ import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.crypto.CryptoKey;
 
 public interface StoreDriver {
+	
+	/** return the store file path if it is local file storage, otherwise undefined **/
+	Result<String> storePath();
 
 	Result<Website> insertWebsite(Website website);
 	
