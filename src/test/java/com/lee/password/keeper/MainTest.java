@@ -1,7 +1,12 @@
 package com.lee.password.keeper;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.channels.FileChannel;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
@@ -18,14 +23,47 @@ public class MainTest {
 	public static void main(String[] args) throws Exception {
 		// testByteBuffer();
 		// testCrypto();
-		String a = "1";
-		String b = same(a);
-		System.out.println(b == a);
-		Map m1 = new HashMap();
-		m1.put(1, a);
-		Map m2 = new HashMap();
-		m2.put(1, b);
-		System.out.println(m1.get(1) == m2.get(1));
+		String path = "e:/tmp/tmp.pk";
+		File file = new File(path);
+		file.deleteOnExit();
+		FileOutputStream fos = new FileOutputStream(file);
+		for(int i=0; i<10; i++) { fos.write(i); }
+		fos.close();
+		
+		FileInputStream fis = null;
+		System.out.println("before modified: ");
+		fis = new FileInputStream(file);
+		int b = 0;
+		while((b=fis.read()) != -1) {
+			System.out.print(b);
+			System.out.print(" ");
+		}
+		fis.close();
+		System.out.println();
+		
+		RandomAccessFile raf = new RandomAccessFile(file, "rw");
+		FileChannel channel = raf.getChannel();
+		int position = 5;
+		int count = 10 - position;
+		ByteBuffer buf = ByteBuffer.allocate(1).put((byte)10);
+		buf.flip();
+		channel.truncate(10 + 1);
+		channel.position(5);
+		channel.transferFrom(channel, position+1, count);
+		channel.write(buf, position);
+		channel.force(true);
+		channel.close();
+		raf.close();
+		
+		System.out.println("after modified: ");
+		fis = new FileInputStream(file);
+		b = 0;
+		while((b=fis.read()) != -1) {
+			System.out.print(b);
+			System.out.print(" ");
+		}
+		fis.close();
+		System.out.println();
 	}
 	
 	private static String same(String str) { return str; }

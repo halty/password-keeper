@@ -14,15 +14,16 @@ public class BinaryWebsite implements InternalEntity {
 	private static final long EPOCH = epoch();
 	private static final int EPOCH_TIME_BITS = 40;	// high 40 bits, support up to 2050-11-03 19:53:47 GMT
 	
+	private static final int BYTES_LEN_SIZE = 1;
 	private static final int MAX_KEYWORD_BYTES = 32;
 	private static final int MAX_URL_BYTES = 64;
 	private static final int KEYWORD_OFFSET = 8;	// websiteId
 	private static final int URL_OFFSET =
 			KEYWORD_OFFSET	
-			+ 1 + MAX_KEYWORD_BYTES;	// keyword (size + data)
+			+ BYTES_LEN_SIZE + MAX_KEYWORD_BYTES;	// keyword (size + data)
 	private static final int TIMESTAMP_OFFSET =
 			URL_OFFSET
-			+ 1 + MAX_URL_BYTES;		// url (size + data)
+			+ BYTES_LEN_SIZE + MAX_URL_BYTES;		// url (size + data)
 	private static final int COUNT_OFFSET =
 			TIMESTAMP_OFFSET
 			+ 8;	// timestamp
@@ -63,11 +64,11 @@ public class BinaryWebsite implements InternalEntity {
 	
 	/** return the bytes of this object occupied in store file **/
 	public static int occupiedSize() { return OCCUPIED_SIZE; }
-	public static int keywordSize() { return MAX_KEYWORD_BYTES; }
+	public static int keywordSize() { return BYTES_LEN_SIZE + MAX_KEYWORD_BYTES; }
 	public static long keywordPosition(long websitePosition) { return websitePosition + KEYWORD_OFFSET; }
-	public static int urlPortionSize() { return MAX_URL_BYTES + 8; }
+	public static int urlPortionSize() { return BYTES_LEN_SIZE + MAX_URL_BYTES + 8; }
 	public static long urlPortionPosition(long websitePosition) { return websitePosition + URL_OFFSET; }
-	public static int webPortionSize() { return MAX_KEYWORD_BYTES + MAX_URL_BYTES + 8; }
+	public static int webPortionSize() { return BYTES_LEN_SIZE + MAX_KEYWORD_BYTES + BYTES_LEN_SIZE + MAX_URL_BYTES + 8; }
 	public static long webPortionPosition(long websitePosition) { return websitePosition + KEYWORD_OFFSET; }
 	public static int pwdPortionSize() { return OCCUPIED_SIZE - TIMESTAMP_OFFSET; }
 	public static long pwdPortionPosition(long websitePosition) { return websitePosition + TIMESTAMP_OFFSET; }

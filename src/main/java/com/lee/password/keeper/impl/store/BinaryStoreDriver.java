@@ -82,12 +82,12 @@ public class BinaryStoreDriver implements StoreDriver {
 	// flush I/O buffer
 	private ByteBuffer intBuffer;
 	private ByteBuffer longBuffer;
-	private ByteBuffer usernameBuffer;
 	private ByteBuffer keywordBuffer;
 	private ByteBuffer urlPortionWebsiteBuffer;
 	private ByteBuffer webPortionWebsiteBuffer;
 	private ByteBuffer pwdPortionWebsiteBuffer;
 	private ByteBuffer websiteBuffer;
+	private ByteBuffer usernameBuffer;
 	private ByteBuffer keyValuePairBuffer;
 	private ByteBuffer pwdPortionPasswordBuffer;
 	private ByteBuffer pwdAndKvpPortionPasswordBuffer;
@@ -374,12 +374,12 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void initFlushIOBuffer() {
 		intBuffer = ByteBuffer.allocate(4);
 		longBuffer = ByteBuffer.allocate(8);
-		usernameBuffer = ByteBuffer.allocate(BinaryPassword.maxUsernameSize());
 		keywordBuffer = ByteBuffer.allocate(BinaryWebsite.keywordSize());
 		urlPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.urlPortionSize());
 		webPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.webPortionSize());
 		pwdPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.pwdPortionSize());
 		websiteBuffer = ByteBuffer.allocate(BinaryWebsite.occupiedSize());
+		usernameBuffer = ByteBuffer.allocate(BinaryPassword.maxUsernameSize());
 		keyValuePairBuffer = ByteBuffer.allocate(BinaryPassword.keyValuePairSize(secretBlockSize));
 		pwdPortionPasswordBuffer = ByteBuffer.allocate(BinaryPassword.pwdPortionSize(secretBlockSize));
 		pwdAndKvpPortionPasswordBuffer = ByteBuffer.allocate(BinaryPassword.pwdAndKvpPortionSize(secretBlockSize));
@@ -458,7 +458,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			return new Result<Website>(Code.FAIL, "remained password list mapping with webiste id");
 		}
 		if(appendDeleteOperation(biWebsite)) {
-			return new Result<Website>(Code.SUCCESS, "success", website);
+			return new Result<Website>(Code.SUCCESS, "success", biWebsite.transform());
 		}else {
 			return new Result<Website>(Code.FAIL, "delete binary website internal error");
 		}
@@ -533,6 +533,7 @@ public class BinaryStoreDriver implements StoreDriver {
 				newBiWebsite = biWebsite2.copy();
 				newBiWebsite.changeUrl(url);
 				oldBiWebsite.markUrlChanged();
+				website.keyword(biWebsite2.keyword());
 			}
 		}else {
 			BinaryWebsite biWebsite = websiteKeywordMap.get(keyword);
@@ -544,6 +545,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			newBiWebsite = biWebsite.copy();
 			newBiWebsite.changeUrl(url);
 			oldBiWebsite.markUrlChanged();
+			website.id(biWebsite.websiteId());
 		}
 		if(appendUpdateOperation(oldBiWebsite, newBiWebsite)) {
 			return new Result<Website>(Code.SUCCESS, "success", website);
