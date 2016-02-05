@@ -655,7 +655,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			if(biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(Code.FAIL, "an existed entry mapping for this header");
 			}
-			biPasswordResult = encrypt(entry, encryptKey);
+			biPasswordResult = encrypt(entry, encryptKey, true);
 			if(!biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(biPasswordResult.code, biPasswordResult.msg);
 			}
@@ -671,20 +671,27 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 	}
 	
-	private Result<BinaryPassword> encrypt(Password password, CryptoKey encryptKey) {
+	private Result<BinaryPassword> encrypt(Password password, CryptoKey encryptKey, boolean forInsert) {
 		Password.Header header = password.header();
 		Password.Secret secret = password.secret();
 		String pwd = secret.password();
 		String kvp = secret.keyValuePairs();
-		if(pwd == null || pwd.isEmpty()) { return new Result<BinaryPassword>(Code.FAIL, "pasword is empty"); }
-		if(kvp == null) { kvp = ""; }
+		
 		BinaryPassword biPassword = new BinaryPassword(header.websiteId(), header.username(), header.timestamp());
-		Result<byte[]> encryptedResult = cryptoDriver.encrypt(pwd.getBytes(CHARSET), encryptKey);
-		if(!encryptedResult.isSuccess()) {
-			return new Result<BinaryPassword>(Code.FAIL, "password encrypt failed: "+encryptedResult.msg);
+		if(pwd == null || pwd.isEmpty()) {
+			if(forInsert) { return new Result<BinaryPassword>(Code.FAIL, "pasword is empty"); }
+		}else {
+			Result<byte[]> encryptedResult = cryptoDriver.encrypt(pwd.getBytes(CHARSET), encryptKey);
+			if(!encryptedResult.isSuccess()) {
+				return new Result<BinaryPassword>(Code.FAIL, "password encrypt failed: "+encryptedResult.msg);
+			}
+			biPassword.encryptedPassword(encryptedResult.result);
 		}
-		biPassword.encryptedPassword(encryptedResult.result);
-		encryptedResult = cryptoDriver.encrypt(kvp.getBytes(CHARSET), encryptKey);
+		if(kvp == null) {
+			if(!forInsert) { return new Result<BinaryPassword>(Code.SUCCESS, "success", biPassword); }
+			kvp = "";
+		}
+		Result<byte[]> encryptedResult = cryptoDriver.encrypt(kvp.getBytes(CHARSET), encryptKey);
 		if(!encryptedResult.isSuccess()) {
 			return new Result<BinaryPassword>(Code.FAIL, "key value pair encrypt failed: "+encryptedResult.msg);
 		}
@@ -814,7 +821,7 @@ public class BinaryStoreDriver implements StoreDriver {
 				return new Result<Password.Header>(Code.FAIL, biPasswordResult.msg);
 			}
 			existedPassword = biPasswordResult.result;
-			biPasswordResult = encrypt(entry, encryptKey);
+			biPasswordResult = encrypt(entry, encryptKey, false);
 			if(!biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(biPasswordResult.code, biPasswordResult.msg);
 			}
@@ -823,8 +830,8 @@ public class BinaryStoreDriver implements StoreDriver {
 			return new Result<Password.Header>(Code.FAIL, e.getMessage());
 		}
 		
-		if(BinaryPassword.hasEqualPassword(newPassword, existedPassword)) {
-			if(BinaryPassword.hasEqualKeyValuePair(newPassword, existedPassword)) {
+		if(newPassword.encryptedPassword() == null || BinaryPassword.hasEqualPassword(newPassword, existedPassword)) {
+			if(newPassword.encryptedKeyValuePairs() == null || BinaryPassword.hasEqualKeyValuePair(newPassword, existedPassword)) {
 				return new Result<Password.Header>(Code.FAIL, "nothing changed for password, don't need update");
 			}else {
 				oldPassword = existedPassword.copy();
@@ -835,7 +842,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			oldPassword = existedPassword.copy();
 			oldPassword.markEncryptedPasswordChanged();
 			newPassword.markEncryptedPasswordChanged();
-			if(!BinaryPassword.hasEqualKeyValuePair(newPassword, existedPassword)) {
+			if(newPassword.encryptedKeyValuePairs() != null && !BinaryPassword.hasEqualKeyValuePair(newPassword, existedPassword)) {
 				oldPassword.markEncryptedKeyValuePairsChanged();
 				newPassword.markEncryptedKeyValuePairsChanged();
 			}
@@ -855,7 +862,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void replace(BinaryPassword existedPassword, BinaryPassword newPassword) {
 		if(newPassword.isEncryptedPasswordChanged()) {
-			existedPassword.encryptedKeyValuePairs(newPassword.encryptedPassword());
+			existedPassword.encryptedPassword(newPassword.encryptedPassword());
 		}
 		if(newPassword.isEncryptedKeyValuePairsChanged()) {
 			existedPassword.encryptedKeyValuePairs(newPassword.encryptedKeyValuePairs());
@@ -923,7 +930,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	public Result<List<Password.Header>> listPassword(long websiteId) {
 		List<BinaryPassword> biPasswordList = websiteIdPwdMap.get(websiteId);
 		if(biPasswordList == null || biPasswordList.isEmpty()) {
-			return new Result<List<Password.Header>>(Code.SUCCESS, "no password list mapping with webiste id");
+			return new Result<List<Password.Header>>(Code.FAIL, "no password list mapping with webiste id");
 		}
 		List<Password.Header> list = new ArrayList<Password.Header>(biPasswordList.size());
 		for(BinaryPassword biPassword : biPasswordList) {
@@ -937,7 +944,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	public Result<List<Password.Header>> listPassword(String username) {
 		List<BinaryPassword> biPasswordList = usernamePwdMap.get(username);
 		if(biPasswordList == null || biPasswordList.isEmpty()) {
-			return new Result<List<Password.Header>>(Code.SUCCESS, "no password list mapping with username");
+			return new Result<List<Password.Header>>(Code.FAIL, "no password list mapping with username");
 		}
 		List<Password.Header> list = new ArrayList<Password.Header>(biPasswordList.size());
 		for(BinaryPassword biPassword : biPasswordList) {

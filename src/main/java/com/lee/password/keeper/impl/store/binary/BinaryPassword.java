@@ -207,7 +207,6 @@ public class BinaryPassword implements InternalEntity {
 
 	public void encryptedKeyValuePairs(byte[] encryptedKeyValuePairs) { this.encryptedKeyValuePairs = encryptedKeyValuePairs; }
 	
-	
 	/** mark the encrypted password changed flag **/
 	public void markEncryptedPasswordChanged() { changedFlag |= ENCRYPT_PWD_CHANGED_MASK; }
 	

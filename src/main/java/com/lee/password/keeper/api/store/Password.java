@@ -111,7 +111,7 @@ public class Password implements Entity {
 		
 		public String password() { return password; }
 		
-		public String keyValuePairs() { return keyValuePairs == null ? "" : keyValuePairs.toString(); }
+		public String keyValuePairs() { return keyValuePairs == null ? null : keyValuePairs.toString(); }
 	}
 
 	@Override
