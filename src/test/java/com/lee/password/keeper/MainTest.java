@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -30,8 +31,11 @@ public class MainTest {
 		for(int i=0; i<10; i++) { fos.write(i); }
 		fos.close();
 		
+		RandomAccessFile raf = new RandomAccessFile(file, "rw");
+		FileChannel channel = raf.getChannel();
+		
 		FileInputStream fis = null;
-		System.out.println("before modified: ");
+		System.out.println("source: ");
 		fis = new FileInputStream(file);
 		int b = 0;
 		while((b=fis.read()) != -1) {
@@ -41,21 +45,26 @@ public class MainTest {
 		fis.close();
 		System.out.println();
 		
-		RandomAccessFile raf = new RandomAccessFile(file, "rw");
-		FileChannel channel = raf.getChannel();
+		long size = channel.size();
+		System.out.println("size="+size);
 		int position = 5;
-		int count = 10 - position;
-		ByteBuffer buf = ByteBuffer.allocate(1).put((byte)10);
+		long count = size - position;
+		int expand = 10;
+		ByteBuffer buf = ByteBuffer.allocate(expand).order(ByteOrder.BIG_ENDIAN);
+		for(int i=0; i<expand; i++) {
+			byte bt = (byte) (expand + i);
+			buf.put(bt);
+		}
 		buf.flip();
-		channel.truncate(10 + 1);
-		channel.position(5);
-		channel.transferFrom(channel, position+1, count);
+		
+		channel.position(position+expand);
+		channel.transferTo(position, count, channel);
 		channel.write(buf, position);
 		channel.force(true);
-		channel.close();
-		raf.close();
+		size = channel.size();
 		
-		System.out.println("after modified: ");
+		System.out.println("after expand: ");
+		System.out.println("new size="+size);
 		fis = new FileInputStream(file);
 		b = 0;
 		while((b=fis.read()) != -1) {
@@ -64,6 +73,30 @@ public class MainTest {
 		}
 		fis.close();
 		System.out.println();
+
+		position = 10;
+		int decreament = 5;
+		long nextPosition = position+decreament;
+		count = size - nextPosition;
+		channel.position(nextPosition);
+		channel.transferFrom(channel, position, count);
+		channel.truncate(size - decreament);
+		channel.force(true);
+		size = channel.size();
+		
+		System.out.println("after truncate: ");		
+		System.out.println("new size="+size);
+		fis = new FileInputStream(file);
+		b = 0;
+		while((b=fis.read()) != -1) {
+			System.out.print(b);
+			System.out.print(" ");
+		}
+		fis.close();
+		System.out.println();
+		
+		channel.close();
+		raf.close();
 	}
 	
 	private static String same(String str) { return str; }

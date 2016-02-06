@@ -39,7 +39,7 @@ public class BinaryStoreDriverTest {
 		dataDir = new File("E:/tmp/password-keeper/data");
 		storeDriver = new BinaryStoreDriver(dataDir.getAbsolutePath(), cryptoDriver, privateKey.maxBlockSize());
 	}
-	
+/*	
 	@Test
 	public void testStorePath() {
 		Result<String> result = storeDriver.storePath();
@@ -191,7 +191,7 @@ public class BinaryStoreDriverTest {
 		Assert.assertTrue(resultList.isSuccess());
 		Assert.assertTrue(resultList.result != null && !resultList.result.isEmpty());
 	}
-	
+*/	
 	@Test
 	public void testInsertPassword() {
 		String keyword = "douban";
@@ -479,8 +479,9 @@ public class BinaryStoreDriverTest {
 	}
 	
 	@AfterClass
-	public static void destory() {
-		storeDriver.close();
+	public static void destory() throws Throwable {
+		Result<Throwable> result = storeDriver.close();
+		if(!result.isSuccess()) { throw result.result; }
 		File publicKeyFile = new File(publicKey.path());
 		File privateKeyFile = new File(privateKey.path());
 		File dataFile = new File(storeDriver.storePath().result);

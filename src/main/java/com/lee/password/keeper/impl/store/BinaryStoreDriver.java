@@ -1329,10 +1329,9 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void expandAndFill(long position, ByteBuffer buf, int increamentSize) throws IOException {
 		long fileSize = storeChannel.size();
 		long movedBytes = fileSize - position;
-		storeChannel.truncate(fileSize + increamentSize);
 		if(movedBytes > 0) {
-			storeChannel.position(position);
-			long transferredBytes = storeChannel.transferFrom(storeChannel, position+increamentSize, movedBytes);
+			storeChannel.position(position + increamentSize);
+			long transferredBytes = storeChannel.transferTo(position, movedBytes, storeChannel);
 			if(transferredBytes != movedBytes) {
 				throw new StoreException(String.format("for expand, failed to transfer %d bytes starting at %d to store path: %s",
 						movedBytes, position, storePath));
