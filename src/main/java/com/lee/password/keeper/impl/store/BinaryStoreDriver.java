@@ -51,7 +51,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	private File storePath;
 	private RandomAccessFile storeMappedFile;
 	private FileChannel storeChannel;
-	private FileLock storeLock;
+	// private FileLock storeLock;
 	
 	// metadata
 	/** the number of password **/
@@ -103,7 +103,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			this.storePath = createIfNotExisted(dataDir);
 			this.storeMappedFile = new RandomAccessFile(storePath, "rw");
 			this.storeChannel = storeMappedFile.getChannel();
-			this.storeLock = storeChannel.lock();
+			//this.storeLock = storeChannel.lock();
 			
 			init();
 		}catch(Exception e) {
@@ -390,7 +390,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void release() {
 		try {
 			if(cryptoDriver != null) { cryptoDriver.close(); cryptoDriver = null; }
-			if(storeLock != null) { storeLock.release(); storeLock = null; }
+			// if(storeLock != null) { storeLock.release(); storeLock = null; }
 			if(storeChannel != null) { storeChannel.close(); storeChannel = null; }
 			if(storeMappedFile != null) { storeMappedFile.close(); storeMappedFile = null; }
 		}catch(Exception e) {
@@ -1233,6 +1233,8 @@ public class BinaryStoreDriver implements StoreDriver {
 					undoQueue.offerFirst(first);
 					return new Result<Throwable>(Code.FAIL, "unsupported op type of flush operation: "+op);
 				}
+				// just for test
+				try { flushChanged(); }catch(IOException e) { throw new StoreException("flush changed failed", e); }
 			}
 			return new Result<Throwable>(Code.SUCCESS, "success");
 		}finally {
@@ -1436,9 +1438,11 @@ public class BinaryStoreDriver implements StoreDriver {
 			}
 			BinaryWebsite existedWebsite = array[curIndex];
 			long insertingPosition = position;
+			long pwdOffsetOfWebsite = 0;
 			if(actualCount > 0) {
 				if(existedWebsite.isValidOffset()) {
-					insertingPosition += existedWebsite.offset();
+					pwdOffsetOfWebsite = existedWebsite.offset();
+					insertingPosition += pwdOffsetOfWebsite;
 					insertingPosition += existedWebsite.count()*size;
 				}else {
 					int prevIndex = -1;
@@ -1453,12 +1457,13 @@ public class BinaryStoreDriver implements StoreDriver {
 						insertingPosition += prevWebsite.offset();
 						insertingPosition += prevWebsite.count()*size;
 					}
+					pwdOffsetOfWebsite = insertingPosition - position;
 				}
 			}
 			expandAndFill(insertingPosition, buf, size);
 			writePasswordCount(actualCount+1);
 			writeWebsiteOffset(readWebsiteOffset()+size);
-			writeCurrentPwdCountAndOffset(curIndex, array, insertingPosition-position, 1);
+			writeCurrentPwdCountAndOffset(curIndex, array, pwdOffsetOfWebsite, 1);
 			writeSucceedingOffsets(array, curIndex+1, actualWebsiteCount, size);
 		}catch(IOException e) {
 			throw new StoreException(String.format("failed to insert password with website id=%d and username=%s from store path: %s",
