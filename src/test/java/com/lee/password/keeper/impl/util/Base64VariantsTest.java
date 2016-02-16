@@ -2,7 +2,7 @@ package com.lee.password.keeper.impl.util;
 
 import java.nio.charset.Charset;
 
-public class Base64Test {
+public class Base64VariantsTest {
 
 	public static void main(String[] args) {
 		Charset charset = Charset.forName("UTF-8");

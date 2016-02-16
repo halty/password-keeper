@@ -1,13 +1,12 @@
 package com.lee.password.keeper.impl.store.binary;
 
-import static com.lee.password.keeper.api.store.Password.CHARSET;
-
 import java.nio.ByteBuffer;
 
 import com.lee.password.keeper.api.store.Password;
 import com.lee.password.keeper.api.store.StoreException;
 import com.lee.password.keeper.impl.InternalEntity;
 import com.lee.password.keeper.impl.util.Base64Variants;
+import com.lee.password.keeper.impl.util.BytePadding;
 
 public class BinaryPassword implements InternalEntity {
 
@@ -78,16 +77,16 @@ public class BinaryPassword implements InternalEntity {
 		int len = target.username.length;
 		buffer.put((byte)len);
 		buffer.put(target.username);
-		buffer.position(buffer.position() + (MAX_USER_NAME_LEN - len)); // skip remaining bytes with username slot
+		BytePadding.padding(buffer, MAX_USER_NAME_LEN - len);
 		buffer.putLong(target.timestamp);
 		len = target.encryptedPassword.length;
 		buffer.putShort((short)len);
 		buffer.put(target.encryptedPassword);
-		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+		BytePadding.padding(buffer, secretBlockSize - len);
 		len = target.encryptedKeyValuePairs.length;
 		buffer.putShort((short)len);
 		if(len > 0) { buffer.put(target.encryptedKeyValuePairs); }
-		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted kvp slot
+		BytePadding.padding(buffer, secretBlockSize - len);
 	}
 	
 	public static void writePwdPortion(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
@@ -95,7 +94,7 @@ public class BinaryPassword implements InternalEntity {
 		int len = target.encryptedPassword.length;
 		buffer.putShort((short)len);
 		buffer.put(target.encryptedPassword);
-		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+		BytePadding.padding(buffer, secretBlockSize - len);
 	}
 	
 	public static void writePwdAndKvpPortion(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
@@ -103,18 +102,18 @@ public class BinaryPassword implements InternalEntity {
 		int len = target.encryptedPassword.length;
 		buffer.putShort((short)len);
 		buffer.put(target.encryptedPassword);
-		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted password slot
+		BytePadding.padding(buffer, secretBlockSize - len);
 		len = target.encryptedKeyValuePairs.length;
 		buffer.putShort((short)len);
 		if(len > 0) { buffer.put(target.encryptedKeyValuePairs); }
-		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted kvp slot
+		BytePadding.padding(buffer, secretBlockSize - len);
 	}
 	
 	public static void writeKeyValuePair(ByteBuffer buffer, int secretBlockSize, BinaryPassword target) {
 		int len = target.encryptedKeyValuePairs.length;
 		buffer.putShort((short)len);
 		if(len > 0) { buffer.put(target.encryptedKeyValuePairs); }
-		buffer.position(buffer.position() + (secretBlockSize - len)); // skip remaining bytes with encrypted kvp slot
+		BytePadding.padding(buffer, secretBlockSize - len);
 	}
 	
 	public static boolean hasEqualUsername(BinaryPassword one, ByteBuffer usernameBuf) {
@@ -191,7 +190,7 @@ public class BinaryPassword implements InternalEntity {
 		return password;
 	}
 	
-	public Password transformWithSecret() { return new Password(websiteId, username()); }
+	public Password transformWithoutSecret() { return new Password(websiteId, username()); }
 
 	public long websiteId() { return websiteId; }
 

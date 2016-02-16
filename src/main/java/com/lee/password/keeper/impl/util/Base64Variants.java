@@ -5,7 +5,6 @@ import java.nio.charset.Charset;
 /**
  * Static methods for translating string with charset to Base64 encoded bytes
  * and vice-versa.
- *
  */
 public class Base64Variants {
 	

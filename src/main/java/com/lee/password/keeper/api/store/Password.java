@@ -3,13 +3,9 @@ package com.lee.password.keeper.api.store;
 import java.io.UnsupportedEncodingException;
 import java.net.URLDecoder;
 import java.net.URLEncoder;
-import java.nio.charset.Charset;
-
 import com.lee.password.keeper.api.Entity;
 
 public class Password implements Entity {
-	
-	public static final Charset CHARSET = Charset.forName("UTF-8");
 	
 	private final Header header;
 	private final Secret secret;

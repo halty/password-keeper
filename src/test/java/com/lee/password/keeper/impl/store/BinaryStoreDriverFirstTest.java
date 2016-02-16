@@ -8,6 +8,8 @@ import org.junit.Assert;
 import org.junit.BeforeClass;
 import org.junit.Test;
 
+import com.lee.password.keeper.api.Entity;
+import com.lee.password.keeper.api.Entity.Type;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.crypto.CryptoDriver;
 import com.lee.password.keeper.api.crypto.CryptoKey;
@@ -18,7 +20,7 @@ import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.keeper.impl.crypto.RSACryptoDriver;
 
-public class BinaryStoreDriverTest {
+public class BinaryStoreDriverFirstTest {
 
 	private static int keySize;
 	private static File keyDir;
@@ -31,15 +33,15 @@ public class BinaryStoreDriverTest {
 	@BeforeClass
 	public static void init() {
 		keySize = 1024;
-		keyDir = new File("E:/tmp/password-keeper/key");
+		keyDir = new File("E:/tmp/password-keeper/first");
 		cryptoDriver = new RSACryptoDriver();
 		Result<CryptoKey[]> keyPair = cryptoDriver.generateKeyPair(keyDir.getAbsolutePath(), keySize);
 		publicKey = keyPair.result[0];
 		privateKey = keyPair.result[1];
-		dataDir = new File("E:/tmp/password-keeper/data");
-		storeDriver = new BinaryStoreDriver(dataDir.getAbsolutePath(), cryptoDriver, privateKey.maxBlockSize());
+		dataDir = new File("E:/tmp/password-keeper/first");
+		storeDriver = new BinaryStoreDriver(dataDir.getAbsolutePath(), cryptoDriver, privateKey.maxBlockSize(), false);
 	}
-/*	
+	
 	@Test
 	public void testStorePath() {
 		Result<String> result = storeDriver.storePath();
@@ -191,7 +193,7 @@ public class BinaryStoreDriverTest {
 		Assert.assertTrue(resultList.isSuccess());
 		Assert.assertTrue(resultList.result != null && !resultList.result.isEmpty());
 	}
-*/	
+	
 	@Test
 	public void testInsertPassword() {
 		String keyword = "douban";
@@ -476,6 +478,86 @@ public class BinaryStoreDriverTest {
 		
 		listResult = storeDriver.listPassword("");
 		Assert.assertFalse(listResult.isSuccess());
+	}
+	
+	@Test
+	public void testUndo() {
+		String keyword = "tmall";
+		String url = "www.tmall.com";
+		Website website = new Website(keyword, url);
+		Result<Website> result = storeDriver.insertWebsite(website);
+		Assert.assertTrue(result.isSuccess());
+		Assert.assertTrue(result.result.hasId());
+		long websiteId = result.result.id();
+		
+		String username = "phoneNumber";
+		String password = "13912345678";
+		Password entry = new Password(websiteId, username);
+		entry.password(password);
+		Result<Header> pwdResult = storeDriver.insertPassword(entry, publicKey);
+		Assert.assertTrue(pwdResult.isSuccess());
+		
+		Result<Integer> undoTimesResult = storeDriver.canUndoTimes();
+		Assert.assertTrue(undoTimesResult.isSuccess());
+		Assert.assertTrue(undoTimesResult.result >= 2);
+		
+		Result<Entity> action = storeDriver.undo();
+		Assert.assertTrue(action.isSuccess());
+		Assert.assertTrue(action.result.type() == Type.PASSWORD);
+		Password pwd = (Password) action.result;
+		Assert.assertEquals(websiteId, pwd.header().websiteId());
+		Assert.assertEquals(username, pwd.header().username());
+	}
+	
+	@Test
+	public void testRedo() {
+		String keyword = "amazon";
+		String url = "www.amazon.com";
+		Website website = new Website(keyword, url);
+		Result<Website> result = storeDriver.insertWebsite(website);
+		Assert.assertTrue(result.isSuccess());
+		Assert.assertTrue(result.result.hasId());
+		long websiteId = result.result.id();
+		
+		String username = "phoneNumber";
+		String password = "13912345678";
+		Password entry = new Password(websiteId, username);
+		entry.password(password);
+		Result<Header> pwdResult = storeDriver.insertPassword(entry, publicKey);
+		Assert.assertTrue(pwdResult.isSuccess());
+		
+		Result<Integer> undoTimesResult = storeDriver.canUndoTimes();
+		Assert.assertTrue(undoTimesResult.isSuccess());
+		Assert.assertTrue(undoTimesResult.result >= 2);
+		
+		Result<Entity> action = storeDriver.undo();
+		Assert.assertTrue(action.isSuccess());
+		Assert.assertTrue(action.result.type() == Type.PASSWORD);
+		Password pwd = (Password) action.result;
+		Assert.assertEquals(websiteId, pwd.header().websiteId());
+		Assert.assertEquals(username, pwd.header().username());
+		
+		Result<Integer> redoTimesResult = storeDriver.canRedoTimes();
+		Assert.assertTrue(redoTimesResult.isSuccess());
+		Assert.assertTrue(redoTimesResult.result >= 1);
+		
+		action = storeDriver.redo();
+		Assert.assertTrue(action.isSuccess());
+		Assert.assertTrue(action.result.type() == Type.PASSWORD);
+		pwd = (Password) action.result;
+		Assert.assertEquals(websiteId, pwd.header().websiteId());
+		Assert.assertEquals(username, pwd.header().username());
+	}
+	
+	@Test
+	public void testFlush() {
+		Result<Throwable> result = storeDriver.flush();
+		Assert.assertTrue(result.isSuccess());
+		Assert.assertNull(result.result);
+		
+		Result<Integer> undoTimesResult = storeDriver.canUndoTimes();
+		Assert.assertTrue(undoTimesResult.isSuccess());
+		Assert.assertTrue(undoTimesResult.result == 0);
 	}
 	
 	@AfterClass

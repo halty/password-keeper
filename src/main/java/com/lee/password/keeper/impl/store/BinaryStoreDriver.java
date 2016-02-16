@@ -51,7 +51,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	private File storePath;
 	private RandomAccessFile storeMappedFile;
 	private FileChannel storeChannel;
-	// private FileLock storeLock;
+	private FileLock storeLock;
 	
 	// metadata
 	/** the number of password **/
@@ -96,14 +96,14 @@ public class BinaryStoreDriver implements StoreDriver {
 	/** closed flag **/
 	private boolean isClosed;
 	
-	public BinaryStoreDriver(String dataDir, CryptoDriver cryptoDriver, int secretBlockSize) {
+	public BinaryStoreDriver(String dataDir, CryptoDriver cryptoDriver, int secretBlockSize, boolean lockStore) {
 		try {
 			this.secretBlockSize = secretBlockSize;
 			this.cryptoDriver = cryptoDriver;
 			this.storePath = createIfNotExisted(dataDir);
 			this.storeMappedFile = new RandomAccessFile(storePath, "rw");
 			this.storeChannel = storeMappedFile.getChannel();
-			//this.storeLock = storeChannel.lock();
+			if(lockStore) { this.storeLock = storeChannel.lock(); }
 			
 			init();
 		}catch(Exception e) {
@@ -158,6 +158,29 @@ public class BinaryStoreDriver implements StoreDriver {
 		isClosed = false;
 	}
 	
+	private void initUndoAndRedoDeque() {
+		this.undoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
+		this.redoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
+	}
+	
+	private void initFlushIOBuffer() {
+		intBuffer = byteOrder(ByteBuffer.allocate(4));
+		longBuffer = byteOrder(ByteBuffer.allocate(8));
+		keywordBuffer = byteOrder(ByteBuffer.allocate(BinaryWebsite.keywordSize()));
+		urlPortionWebsiteBuffer = byteOrder(ByteBuffer.allocate(BinaryWebsite.urlPortionSize()));
+		webPortionWebsiteBuffer = byteOrder(ByteBuffer.allocate(BinaryWebsite.webPortionSize()));
+		pwdPortionWebsiteBuffer = byteOrder(ByteBuffer.allocate(BinaryWebsite.pwdPortionSize()));
+		websiteBuffer = byteOrder(ByteBuffer.allocate(BinaryWebsite.occupiedSize()));
+		usernameBuffer = byteOrder(ByteBuffer.allocate(BinaryPassword.maxUsernameSize()));
+		keyValuePairBuffer = byteOrder(ByteBuffer.allocate(BinaryPassword.keyValuePairSize(secretBlockSize)));
+		pwdPortionPasswordBuffer = byteOrder(ByteBuffer.allocate(BinaryPassword.pwdPortionSize(secretBlockSize)));
+		pwdAndKvpPortionPasswordBuffer = byteOrder(ByteBuffer.allocate(BinaryPassword.pwdAndKvpPortionSize(secretBlockSize)));
+		passwordBuffer = byteOrder(ByteBuffer.allocate(BinaryPassword.occupiedSize(secretBlockSize)));
+	}
+	
+	/** denote the byte order **/
+	private ByteBuffer byteOrder(ByteBuffer buf) { return buf.order(ByteOrder.BIG_ENDIAN); }
+	
 	/** init an data file with metadata **/
 	private void initStore() throws Exception {
 		long offset = MAGIC.length + META_DATA_LEN;
@@ -168,9 +191,8 @@ public class BinaryStoreDriver implements StoreDriver {
 		this.metadataBuffer = initMetaBuffer(passwordCount, passwordOffset, websiteCount, websiteOffset);
 		metadataBuffer.clear();
 		
-		storeChannel.truncate(offset);
 		storeChannel.position(0);
-		storeChannel.write(ByteBuffer.wrap(MAGIC));
+		storeChannel.write(byteOrder(ByteBuffer.wrap(MAGIC)));
 		storeChannel.write(metadataBuffer);
 		storeChannel.force(true);
 		
@@ -183,7 +205,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private ByteBuffer initMetaBuffer(int passwordCount, long passwordOffset, int websiteCount, long websiteOffset) {
-		ByteBuffer buf = ByteBuffer.allocate(META_DATA_LEN).order(ByteOrder.BIG_ENDIAN)
+		ByteBuffer buf = byteOrder(ByteBuffer.allocate(META_DATA_LEN))
 				.putInt(passwordCount)
 				.putLong(passwordOffset)
 				.putInt(websiteCount)
@@ -202,7 +224,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void matchMagic() throws IOException {
 		int expectedLen = MAGIC.length;
 		byte[] magic = new byte[expectedLen];
-		int len = storeChannel.read(ByteBuffer.wrap(magic), 0);
+		int len = storeChannel.read(byteOrder(ByteBuffer.wrap(magic)), 0);
 		if(len != expectedLen) {
 			throw new StoreException("incorrect magic number size from store path: "+storePath);
 		}
@@ -213,7 +235,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void loadMetadata() {
 		try {
-			this.metadataBuffer = ByteBuffer.allocate(META_DATA_LEN).order(ByteOrder.BIG_ENDIAN);
+			this.metadataBuffer = byteOrder(ByteBuffer.allocate(META_DATA_LEN));
 			metadataBuffer.clear();
 			int len = storeChannel.read(metadataBuffer, MAGIC.length);
 			if(len != META_DATA_LEN) {
@@ -237,23 +259,26 @@ public class BinaryStoreDriver implements StoreDriver {
 		this.sortedWebsitesBuffer = new BinaryWebsite[10];
 		if(count == 0) { return; }
 		
-		int size = count * BinaryWebsite.occupiedSize();
-		/* mapping is more expensive than reading or writing, it is only worth
+		/**
+		 * mapping is more expensive than reading or writing, it is only worth
 		 * mapping relatively large files.
 		 * generally, pasword store is a small file, so we use read or write methods here.
 		 */
-		ByteBuffer websitesBuffer = ByteBuffer.allocate(size);
-		int readBytes = storeChannel.read(websitesBuffer, position);
-		if(readBytes != size) {
-			throw new StoreException("incorrect website data size from store path: "+storePath);
-		}
-		websitesBuffer = websitesBuffer.order(ByteOrder.BIG_ENDIAN).asReadOnlyBuffer();
-		websitesBuffer.clear();
-		
+		ByteBuffer websiteBuffer = this.websiteBuffer;
+		int size = BinaryWebsite.occupiedSize();
 		long lastWebsiteId = Long.MIN_VALUE;
 		int totalPasswordCount = 0;
 		for(int i=0; i<count; i++) {
-			BinaryWebsite website = BinaryWebsite.read(websitesBuffer);
+			websiteBuffer.clear();
+			int readBytes = storeChannel.read(websiteBuffer, position);
+			if(readBytes != size) {
+				throw new StoreException(String.format("%d bytes starting at %d is not enough for website data from store path: %s",
+						readBytes, position, storePath));
+			}
+			websiteBuffer.flip();
+			position += size;
+			
+			BinaryWebsite website = BinaryWebsite.read(websiteBuffer);
 			long websiteId = website.websiteId();
 			if(lastWebsiteId > websiteId) {
 				// website data placed order by website id asc in store file
@@ -318,6 +343,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void loadPasswords() throws IOException {
+		int websiteCount = this.websiteCount;
 		long position = this.passwordOffset;
 		int count = this.passwordCount;
 		this.passwordMap = new HashMap<PasswordKey, BinaryPassword>(count);
@@ -325,34 +351,36 @@ public class BinaryStoreDriver implements StoreDriver {
 		this.usernamePwdMap = new HashMap<String, List<BinaryPassword>>();
 		if(count == 0) { return; }
 		
-		int entrySize = BinaryPassword.occupiedSize(this.secretBlockSize);
-		int size = count * entrySize;
-		ByteBuffer passwordsBuffer = ByteBuffer.allocate(size);
-		int readBytes = storeChannel.read(passwordsBuffer, position);
-		if(readBytes != size) {
-			throw new StoreException("incorrect password data size from store path: "+storePath);
-		}
-		passwordsBuffer = passwordsBuffer.order(ByteOrder.BIG_ENDIAN).asReadOnlyBuffer();
-		passwordsBuffer.clear();
-
 		BinaryWebsite[] sortedView = this.sortedWebsitesBuffer;
+		int size = BinaryPassword.occupiedSize(this.secretBlockSize);
 		int offset = 0;
-		for(BinaryWebsite website : sortedView) {
+		for(int i=0; i<websiteCount; i++) {
+			BinaryWebsite website = sortedView[i];
 			if(website.offset() != offset) {
 				// password data placed order by website id asc in store file
 				throw new StoreException(String.format("incorrect password data order for website id=%d from store path: %s",
 						website.websiteId(), storePath));
 			}
-			loadPasswordsBy(website, passwordsBuffer);
-			offset += website.count() * entrySize;
+			loadPasswordsBy(size, website, position+offset);
+			offset += website.count() * size;
 		}
 	}
 	
-	private void loadPasswordsBy(BinaryWebsite website, ByteBuffer passwordsBuffer) {
+	private void loadPasswordsBy(int passwordSize, BinaryWebsite website, long position) throws IOException {
 		long websiteId = website.websiteId();
 		int count = website.count();
+		ByteBuffer passwordBuffer = this.passwordBuffer;
 		for(int i=0; i<count; i++) {
-			BinaryPassword password = BinaryPassword.read(passwordsBuffer, secretBlockSize);
+			passwordBuffer.clear();
+			int readBytes = storeChannel.read(passwordBuffer, position);
+			if(readBytes != passwordSize) {
+				throw new StoreException(String.format("%d bytes starting at %d is not enough for password data from store path: %s",
+						readBytes, position, storePath));
+			}
+			passwordBuffer.flip();
+			position += passwordSize;
+			
+			BinaryPassword password = BinaryPassword.read(passwordBuffer, secretBlockSize);
 			/* generally, one person who may not register multiple account on the same website,
 			 * so all the password data belong to the same website don't placed in order.
 			 */
@@ -366,31 +394,11 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 	}
 	
-	private void initUndoAndRedoDeque() {
-		this.undoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
-		this.redoQueue = new LinkedList<ChangedOperation<? extends InternalEntity>>();
-	}
-	
-	private void initFlushIOBuffer() {
-		intBuffer = ByteBuffer.allocate(4);
-		longBuffer = ByteBuffer.allocate(8);
-		keywordBuffer = ByteBuffer.allocate(BinaryWebsite.keywordSize());
-		urlPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.urlPortionSize());
-		webPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.webPortionSize());
-		pwdPortionWebsiteBuffer = ByteBuffer.allocate(BinaryWebsite.pwdPortionSize());
-		websiteBuffer = ByteBuffer.allocate(BinaryWebsite.occupiedSize());
-		usernameBuffer = ByteBuffer.allocate(BinaryPassword.maxUsernameSize());
-		keyValuePairBuffer = ByteBuffer.allocate(BinaryPassword.keyValuePairSize(secretBlockSize));
-		pwdPortionPasswordBuffer = ByteBuffer.allocate(BinaryPassword.pwdPortionSize(secretBlockSize));
-		pwdAndKvpPortionPasswordBuffer = ByteBuffer.allocate(BinaryPassword.pwdAndKvpPortionSize(secretBlockSize));
-		passwordBuffer = ByteBuffer.allocate(BinaryPassword.occupiedSize(secretBlockSize));
-	}
-	
 	/** release all resources **/
 	private void release() {
 		try {
 			if(cryptoDriver != null) { cryptoDriver.close(); cryptoDriver = null; }
-			// if(storeLock != null) { storeLock.release(); storeLock = null; }
+			if(storeLock != null) { storeLock.release(); storeLock = null; }
 			if(storeChannel != null) { storeChannel.close(); storeChannel = null; }
 			if(storeMappedFile != null) { storeMappedFile.close(); storeMappedFile = null; }
 		}catch(Exception e) {
@@ -958,11 +966,6 @@ public class BinaryStoreDriver implements StoreDriver {
 	public Result<Integer> canUndoTimes() {
 		return new Result<Integer>(Code.SUCCESS, "success", undoQueue.size());
 	}
-	
-	@Override
-	public Result<Integer> canRedoTimes() {
-		return new Result<Integer>(Code.SUCCESS, "success", redoQueue.size());
-	}
 
 	@Override
 	public Result<Entity> undo() {
@@ -994,7 +997,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			}
 		}else {
 			BinaryPassword biPassword = (BinaryPassword) internalEntity;
-			entity = biPassword.transformWithSecret();
+			entity = biPassword.transformWithoutSecret();
 			if(!undoInsertPassword(biPassword)) {
 				undoQueue.offer(last);
 				return new Result<Entity>(Code.FAIL, "undo last insert password operation failed", entity);
@@ -1020,7 +1023,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			}
 		}else {
 			BinaryPassword biPassword = (BinaryPassword) internalEntity;
-			entity = biPassword.transformWithSecret();
+			entity = biPassword.transformWithoutSecret();
 			if(!undoDeletePassword(biPassword)) {
 				undoQueue.offer(last);
 				return new Result<Entity>(Code.FAIL, "undo last delete password operation failed", entity);
@@ -1049,7 +1052,7 @@ public class BinaryStoreDriver implements StoreDriver {
 		}else {
 			BinaryPassword oldPassword = (BinaryPassword) before;
 			BinaryPassword newPassword = (BinaryPassword) after;
-			entity = oldPassword.transformWithSecret();
+			entity = oldPassword.transformWithoutSecret();
 			if(!undoUpdatePassword(oldPassword, newPassword)) {
 				undoQueue.offer(last);
 				return new Result<Entity>(Code.FAIL, "undo last update password operation failed", entity);
@@ -1067,6 +1070,11 @@ public class BinaryStoreDriver implements StoreDriver {
 		if(existedPassword == null) { return false; }
 		replace(existedPassword, oldPassword);
 		return true;
+	}
+	
+	@Override
+	public Result<Integer> canRedoTimes() {
+		return new Result<Integer>(Code.SUCCESS, "success", redoQueue.size());
 	}
 
 	@Override
@@ -1099,7 +1107,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			}
 		}else {
 			BinaryPassword biPassword = (BinaryPassword) internalEntity;
-			entity = biPassword.transformWithSecret();
+			entity = biPassword.transformWithoutSecret();
 			if(!redoInsertPassword(biPassword)) {
 				redoQueue.offer(last);
 				return new Result<Entity>(Code.FAIL, "redo last insert password operation failed", entity);
@@ -1125,7 +1133,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			}
 		}else {
 			BinaryPassword biPassword = (BinaryPassword) internalEntity;
-			entity = biPassword.transformWithSecret();
+			entity = biPassword.transformWithoutSecret();
 			if(!redoDeletePassword(biPassword)) {
 				redoQueue.offer(last);
 				return new Result<Entity>(Code.FAIL, "redo last delete password operation failed", entity);
@@ -1154,7 +1162,7 @@ public class BinaryStoreDriver implements StoreDriver {
 		}else {
 			BinaryPassword oldPassword = (BinaryPassword) before;
 			BinaryPassword newPassword = (BinaryPassword) after;
-			entity = oldPassword.transformWithSecret();
+			entity = oldPassword.transformWithoutSecret();
 			if(!redoUpdatePassword(oldPassword, newPassword)) {
 				redoQueue.offer(last);
 				return new Result<Entity>(Code.FAIL, "redo last update password operation failed", entity);
@@ -1280,7 +1288,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			}
 			return;
 		}
-		ByteBuffer buf = longBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = longBuffer;
 		int length = buf.capacity();
 		if(offsetCount == 0) { // first
 			buf.clear();
@@ -1330,19 +1338,39 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void expandAndFill(long position, ByteBuffer buf, int increamentSize) throws IOException {
 		long fileSize = storeChannel.size();
-		long movedBytes = fileSize - position;
+		int movedBytes = (int) (fileSize - position);
 		if(movedBytes > 0) {
-			storeChannel.position(position + increamentSize);
-			long transferredBytes = storeChannel.transferTo(position, movedBytes, storeChannel);
-			if(transferredBytes != movedBytes) {
-				throw new StoreException(String.format("for expand, failed to transfer %d bytes starting at %d to store path: %s",
-						movedBytes, position, storePath));
-			}
+			transfer(position, movedBytes, position + increamentSize);
 		}
 		int writeBytes = storeChannel.write(buf, position);
 		if(writeBytes != increamentSize) {
 			throw new StoreException(String.format("failed to write %d bytes starting at %d to store path: %s",
 					increamentSize, position, storePath));
+		}
+	}
+	
+	private void transfer(long srcPosition, int transferBytes, long destPosition) throws IOException {
+		/**
+		 * when using transferFrom() or transferTo() on a FileChannel to transfer data from one region of
+		 * the file to another, the call hangs on the OS X platform, whether the source region overlap with
+		 * destination region or not, a similar bug report for openjdk see {@link https://bugs.openjdk.java.net/browse/JDK-8140241};
+		 * while on Windows platform, the call doesn't hang, but causes data overwritten if two regions overlaps;
+		 * other platforms not tested;
+		 * 
+		 * although transfer operation is potentially much more efficient, a simple loop that reads from
+		 * this channel and writes to itself was also choosen for corectness guarantee.
+		 */
+		ByteBuffer movedBuf = ByteBuffer.allocate((int)transferBytes);
+		int readBytes = storeChannel.read(movedBuf, srcPosition);
+		if(readBytes != transferBytes) {
+			throw new StoreException(String.format("for expand, failed to read %d bytes starting at %d from store path: %s",
+					transferBytes, srcPosition, storePath));
+		}
+		movedBuf.flip();
+		int writeBytes = storeChannel.write(movedBuf, destPosition);
+		if(writeBytes != transferBytes) {
+			throw new StoreException(String.format("for expand, failed to write %d bytes starting at %d to store path: %s",
+					transferBytes, destPosition, storePath));
 		}
 	}
 
@@ -1353,15 +1381,13 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private int readIntFromMetadataBuffer(int offset) {
 		ByteBuffer buf = metadataBuffer;
-		buf.clear();
-		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		buf.clear().position(offset);
 		return buf.getInt();
 	}
 	
 	private long readLongFromMetadataBuffer(int offset) {
 		ByteBuffer buf = metadataBuffer;
-		buf.clear();
-		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		buf.clear().position(offset);
 		return buf.getLong();
 	}
 	
@@ -1373,15 +1399,14 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void writeIntToMetadataBuffer(int offset, int value) {
 		ByteBuffer buf = metadataBuffer;
-		buf.clear();
-		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		buf.clear().position(offset);
 		buf.putInt(value);
 		
 		writeInt(MAGIC.length + offset, value);
 	}
 	
 	private void writeInt(long position, int value) {
-		ByteBuffer buf = intBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = intBuffer;
 		buf.clear();
 		buf.putInt(value);
 		buf.flip();
@@ -1403,15 +1428,14 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void writeLongToMetadataBuffer(int offset, long value) {
 		ByteBuffer buf = metadataBuffer;
-		buf.clear();
-		buf.order(ByteOrder.BIG_ENDIAN).position(offset);
+		buf.clear().position(offset);
 		buf.putLong(value);
 		
 		writeLong(MAGIC.length + offset, value);
 	}
 	
 	private void writeLong(long position, long value) {
-		ByteBuffer buf = longBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = longBuffer;
 		buf.clear();
 		buf.putLong(value);
 		buf.flip();
@@ -1505,7 +1529,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private void writePwdPortionOfWebsite(long websitePosition, BinaryWebsite website) {
 		long position = BinaryWebsite.pwdPortionPosition(websitePosition);
-		ByteBuffer buf = pwdPortionWebsiteBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = pwdPortionWebsiteBuffer;
 		buf.clear();
 		BinaryWebsite.writePwdPortion(buf, website);
 		buf.flip();
@@ -1562,14 +1586,9 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void truncate(long position, int decreamentSize) throws IOException {
 		long fileSize = storeChannel.size();
 		long nextPosition = position + decreamentSize;
-		long movedBytes = fileSize - nextPosition;
+		int movedBytes = (int) (fileSize - nextPosition);
 		if(movedBytes > 0) {
-			storeChannel.position(nextPosition);
-			long transferredBytes = storeChannel.transferFrom(storeChannel, position, movedBytes);
-			if(transferredBytes != movedBytes) {
-				throw new StoreException(String.format("for truncate, failed to transfer %d bytes starting at %d to store path: %s",
-						movedBytes, nextPosition, storePath));
-			}
+			transfer(nextPosition, movedBytes, position);
 		}
 		storeChannel.truncate(fileSize - decreamentSize);
 	}
@@ -1611,7 +1630,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	/** return the position of target password if it exists, otherwise -1 **/
 	private long findPasswordPostion(long startPosition, int passwordCount, int passwordSize,
 			BinaryPassword targetPassword) throws IOException {
-		ByteBuffer buf = usernameBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = usernameBuffer;
 		long position = startPosition;
 		for(int i=0; i<passwordCount; i++) {
 			buf.clear();
@@ -1666,7 +1685,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void writeKeywordAndUrl(long websitePosition, BinaryWebsite newWebsite) {
-		ByteBuffer buf = webPortionWebsiteBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = webPortionWebsiteBuffer;
 		buf.clear();
 		BinaryWebsite.writeWebPortion(buf, newWebsite);
 		buf.flip();
@@ -1674,7 +1693,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void writeKeyword(long websitePosition, BinaryWebsite newWebsite) {
-		ByteBuffer buf = keywordBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = keywordBuffer;
 		buf.clear();
 		BinaryWebsite.writeKeyword(buf, newWebsite);
 		buf.flip();
@@ -1683,7 +1702,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void writeUrl(long websitePosition, BinaryWebsite newWebsite) {
-		ByteBuffer buf = urlPortionWebsiteBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = urlPortionWebsiteBuffer;
 		buf.clear();
 		BinaryWebsite.writeUrlPortion(buf, newWebsite);
 		buf.flip();
@@ -1733,7 +1752,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void writePwdAndKvp(long startPosition, BinaryPassword newPassword) {
-		ByteBuffer buf = pwdAndKvpPortionPasswordBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = pwdAndKvpPortionPasswordBuffer;
 		buf.clear();
 		BinaryPassword.writePwdAndKvpPortion(buf, secretBlockSize, newPassword);
 		buf.flip();
@@ -1741,7 +1760,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void writePwd(long startPosition, BinaryPassword newPassword) {
-		ByteBuffer buf = pwdPortionPasswordBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = pwdPortionPasswordBuffer;
 		buf.clear();
 		BinaryPassword.writePwdPortion(buf, secretBlockSize, newPassword);
 		buf.flip();
@@ -1749,7 +1768,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	private void writeKvp(long startPosition, BinaryPassword newPassword) {
-		ByteBuffer buf = keyValuePairBuffer.order(ByteOrder.BIG_ENDIAN);
+		ByteBuffer buf = keyValuePairBuffer;
 		buf.clear();
 		BinaryPassword.writeKeyValuePair(buf, secretBlockSize, newPassword);
 		buf.flip();

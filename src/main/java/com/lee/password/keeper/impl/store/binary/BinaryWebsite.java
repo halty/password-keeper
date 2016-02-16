@@ -1,13 +1,13 @@
 package com.lee.password.keeper.impl.store.binary;
 
-import static com.lee.password.keeper.api.store.Password.CHARSET;
-
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 
 import com.lee.password.keeper.api.store.StoreException;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.keeper.impl.InternalEntity;
+import com.lee.password.keeper.impl.util.ByteMask;
+import com.lee.password.keeper.impl.util.BytePadding;
 
 public class BinaryWebsite implements InternalEntity {
 	
@@ -78,12 +78,10 @@ public class BinaryWebsite implements InternalEntity {
 	public static BinaryWebsite read(ByteBuffer buffer) {
 		long websiteId = buffer.getLong();
 		int len = 0xff & buffer.get();
-		byte[] keyword = new byte[len];
-		buffer.get(keyword);
+		byte[] keyword = ByteMask.getAndUnmask(buffer, len);
 		buffer.position(buffer.position() + (MAX_KEYWORD_BYTES - len)); // skip remaining bytes with keyword slot
 		len = 0xff & buffer.get();
-		byte[] url = new byte[len];
-		buffer.get(url);
+		byte[] url = ByteMask.getAndUnmask(buffer, len);
 		buffer.position(buffer.position() + (MAX_URL_BYTES - len)); // skip remaining bytes with url slot
 		long timestamp = buffer.getLong();
 		int count = buffer.getInt();
@@ -98,12 +96,12 @@ public class BinaryWebsite implements InternalEntity {
 		buffer.putLong(target.websiteId);
 		int len = target.keyword.length;
 		buffer.put((byte)len);
-		buffer.put(target.keyword);
-		buffer.position(buffer.position() + (MAX_KEYWORD_BYTES - len)); // skip remaining bytes with keyword slot
+		ByteMask.maskAndPut(target.keyword, buffer);
+		BytePadding.padding(buffer, MAX_KEYWORD_BYTES - len);
 		len = target.url.length;
 		buffer.put((byte)len);
-		buffer.put(target.url);
-		buffer.position(buffer.position() + (MAX_URL_BYTES - len)); // skip remaining bytes with url slot
+		ByteMask.maskAndPut(target.url, buffer);
+		BytePadding.padding(buffer, MAX_URL_BYTES - len);
 		buffer.putLong(target.timestamp);
 		buffer.putInt(target.count);
 		buffer.putLong(target.offset);
@@ -112,27 +110,27 @@ public class BinaryWebsite implements InternalEntity {
 	public static void writeKeyword(ByteBuffer buffer, BinaryWebsite target) {
 		int len = target.keyword.length;
 		buffer.put((byte)len);
-		buffer.put(target.keyword);
-		buffer.position(buffer.position() + (MAX_KEYWORD_BYTES - len)); // skip remaining bytes with keyword slot
+		ByteMask.maskAndPut(target.keyword, buffer);
+		BytePadding.padding(buffer, MAX_KEYWORD_BYTES - len);
 	}
 	
 	public static void writeUrlPortion(ByteBuffer buffer, BinaryWebsite target) {
 		int len = target.url.length;
 		buffer.put((byte)len);
-		buffer.put(target.url);
-		buffer.position(buffer.position() + (MAX_URL_BYTES - len)); // skip remaining bytes with url slot
+		ByteMask.maskAndPut(target.url, buffer);
+		BytePadding.padding(buffer, MAX_URL_BYTES - len);
 		buffer.putLong(target.timestamp);
 	}
 	
 	public static void writeWebPortion(ByteBuffer buffer, BinaryWebsite target) {
 		int len = target.keyword.length;
 		buffer.put((byte)len);
-		buffer.put(target.keyword);
-		buffer.position(buffer.position() + (MAX_KEYWORD_BYTES - len)); // skip remaining bytes with keyword slot
+		ByteMask.maskAndPut(target.keyword, buffer);
+		BytePadding.padding(buffer, MAX_KEYWORD_BYTES - len);
 		len = target.url.length;
 		buffer.put((byte)len);
-		buffer.put(target.url);
-		buffer.position(buffer.position() + (MAX_URL_BYTES - len)); // skip remaining bytes with url slot
+		ByteMask.maskAndPut(target.url, buffer);
+		BytePadding.padding(buffer, MAX_URL_BYTES - len);
 		buffer.putLong(target.timestamp);
 	}
 	

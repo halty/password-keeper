@@ -52,13 +52,13 @@ public interface StoreDriver {
 	
 	Result<Integer> canUndoTimes();
 	
-	Result<Integer> canRedoTimes();
-	
 	/**
 	 * undo the last changed operation, return the undo target entry if success.
 	 * subsequent undo call will be failed after you call {@link #flush()}. 
 	 */
 	Result<Entity> undo();
+	
+	Result<Integer> canRedoTimes();
 	
 	/** redo the last changed operation, return the redo target entry if success **/
 	Result<Entity> redo();

@@ -2,7 +2,9 @@ package com.lee.password.keeper;
 
 import java.io.File;
 import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.RandomAccessFile;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
@@ -24,6 +26,10 @@ public class MainTest {
 	public static void main(String[] args) throws Exception {
 		// testByteBuffer();
 		// testCrypto();
+		// testTransfer();
+	}
+	
+	private static void testTransfer() throws IOException {
 		String path = "e:/tmp/tmp.pk";
 		File file = new File(path);
 		file.deleteOnExit();
@@ -97,9 +103,8 @@ public class MainTest {
 		
 		channel.close();
 		raf.close();
+		
 	}
-	
-	private static String same(String str) { return str; }
 	
 	private static void testByteBuffer() {
 		ByteBuffer buf = ByteBuffer.allocate(10);
