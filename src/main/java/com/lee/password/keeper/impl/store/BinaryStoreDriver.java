@@ -96,14 +96,14 @@ public class BinaryStoreDriver implements StoreDriver {
 	/** closed flag **/
 	private boolean isClosed;
 	
-	public BinaryStoreDriver(String dataDir, CryptoDriver cryptoDriver, int secretBlockSize, boolean lockStore) {
+	public BinaryStoreDriver(String dataDir, CryptoDriver cryptoDriver, int secretBlockSize, boolean lockStoreFile) {
 		try {
 			this.secretBlockSize = secretBlockSize;
 			this.cryptoDriver = cryptoDriver;
 			this.storePath = createIfNotExisted(dataDir);
 			this.storeMappedFile = new RandomAccessFile(storePath, "rw");
 			this.storeChannel = storeMappedFile.getChannel();
-			if(lockStore) { this.storeLock = storeChannel.lock(); }
+			if(lockStoreFile) { this.storeLock = storeChannel.lock(); }
 			
 			init();
 		}catch(Exception e) {

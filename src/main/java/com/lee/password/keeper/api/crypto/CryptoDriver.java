@@ -6,9 +6,9 @@ public interface CryptoDriver {
 
 	/**
 	 * generate public/private key pair with {@code keySize}
-	 * and store them to {@code destDirectory}.
-	 * the first file of return file array is public key file,
-	 * the second file of return file array is private key file.
+	 * and store them to {@code destDirectory}.<br/>
+	 * the first key of return key array is public key;<br/>
+	 * the second key of return key array is private key.
 	 */
 	Result<CryptoKey[]> generateKeyPair(String destDirectory, int keySize);
 	

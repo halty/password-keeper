@@ -2,6 +2,8 @@ package com.lee.password.keeper.impl.util;
 
 import java.nio.charset.Charset;
 
+import com.lee.password.util.ByteMask;
+
 public class ByteMaskTest {
 
 	public static void main(String[] args) {

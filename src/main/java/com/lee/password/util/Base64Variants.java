@@ -1,4 +1,4 @@
-package com.lee.password.keeper.impl.util;
+package com.lee.password.util;
 
 import java.nio.charset.Charset;
 

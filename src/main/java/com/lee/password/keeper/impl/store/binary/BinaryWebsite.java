@@ -6,8 +6,8 @@ import java.text.SimpleDateFormat;
 import com.lee.password.keeper.api.store.StoreException;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.keeper.impl.InternalEntity;
-import com.lee.password.keeper.impl.util.ByteMask;
-import com.lee.password.keeper.impl.util.BytePadding;
+import com.lee.password.util.ByteMask;
+import com.lee.password.util.BytePadding;
 
 public class BinaryWebsite implements InternalEntity {
 	

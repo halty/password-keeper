@@ -2,11 +2,9 @@ package com.lee.password.keeper;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.RandomAccessFile;
-import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.channels.FileChannel;
@@ -14,12 +12,13 @@ import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
-import java.util.Map;
-
+import java.util.List;
 import com.lee.password.keeper.impl.crypto.rsa.RSACryptor;
 import com.lee.password.keeper.impl.crypto.rsa.RSAKeyGenerator;
+import com.lee.password.util.Triple;
 
 public class MainTest {
 
@@ -27,6 +26,65 @@ public class MainTest {
 		// testByteBuffer();
 		// testCrypto();
 		// testTransfer();
+		String cmd = " a 'bc' ' ' '' d  ef";
+		Triple<Boolean, String, List<String>> triple = split(cmd);
+		System.out.println(triple.first);
+		if(triple.first) {
+			List<String> list = triple.third;
+			System.out.println(list.size());
+			System.out.println(list);
+		}else {
+			System.out.println(triple.second);
+		}
+	}
+	
+	private static Triple<Boolean, String, List<String>> split(String commandLine) {
+		if(commandLine == null) {
+			List<String> emptyList = Collections.emptyList();
+			return new Triple<Boolean, String, List<String>>(false, "command line is null", emptyList);
+		}
+
+		int length = commandLine.length();
+		int index = 0;
+		int begin = 0;
+		boolean isBeginWithSingleQuotes = false;
+		List<String> wordList = new ArrayList<String>();
+		while(index < length) {
+			char ch = commandLine.charAt(index);
+			if(ch == '\'') {
+				if(isBeginWithSingleQuotes) {
+					wordList.add(commandLine.substring(begin+1, index));
+					begin = index + 1;
+					isBeginWithSingleQuotes = false;
+				}else {
+					if(begin == index) {
+						isBeginWithSingleQuotes = true;
+					}else {
+						List<String> emptyList = Collections.emptyList();
+						return new Triple<Boolean, String, List<String>>(
+								false, "unexpected end single quotes at index "+(index+1), emptyList);
+					}
+				}
+			}else {
+				if(!isBeginWithSingleQuotes && Character.isWhitespace(ch)) {
+					if(begin < index) { wordList.add(commandLine.substring(begin, index)); }
+					// skip consecutive whitespaces
+					while(++index < length && Character.isWhitespace(commandLine.charAt(index)));
+					begin = index;
+					isBeginWithSingleQuotes = index < length && commandLine.charAt(index) == '\'';
+				}
+			}
+			index++;
+		}
+		if(begin < length) {
+			if(isBeginWithSingleQuotes) {
+				List<String> emptyList = Collections.emptyList();
+				return new Triple<Boolean, String, List<String>>(false, "without end single quotes", emptyList);
+			}else {
+				wordList.add(commandLine.substring(begin, length));
+			}
+		}
+		return new Triple<Boolean, String, List<String>>(true, "success", wordList);
 	}
 	
 	private static void testTransfer() throws IOException {

@@ -5,8 +5,8 @@ import java.nio.ByteBuffer;
 import com.lee.password.keeper.api.store.Password;
 import com.lee.password.keeper.api.store.StoreException;
 import com.lee.password.keeper.impl.InternalEntity;
-import com.lee.password.keeper.impl.util.Base64Variants;
-import com.lee.password.keeper.impl.util.BytePadding;
+import com.lee.password.util.Base64Variants;
+import com.lee.password.util.BytePadding;
 
 public class BinaryPassword implements InternalEntity {
 
