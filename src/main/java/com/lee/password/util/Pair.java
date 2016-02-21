@@ -10,4 +10,8 @@ public final class Pair<E1, E2> {
 		this.first = first;
 		this.second = second;
 	}
+	
+	public static <E1, E2> Pair<E1, E2> create(E1 first, E2 second) {
+		return new Pair<E1, E2>(first, second);
+	}
 }

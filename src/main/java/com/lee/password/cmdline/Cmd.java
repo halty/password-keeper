@@ -7,7 +7,9 @@ import java.util.List;
 import java.util.Map;
 
 import static com.lee.password.cmdline.Environment.*;
+
 import com.lee.password.keeper.impl.crypto.RSACryptoDriver;
+import com.lee.password.keeper.impl.store.BinaryStoreDriver;
 import com.lee.password.util.Triple;
 
 public enum Cmd {
@@ -58,37 +60,81 @@ public enum Cmd {
 	ADD_WEB("add web", CmdArgs.ADD_WEB_ARGS) {
 		@Override
 		public void printDoc() {
-			
+			line("add web -k keyword -u url");
+			line("Note:");
+			indent("before add website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			line("add web -k amazon -u 'www.amazon.com' -- add 'amazon' website with url 'www.amazon.com'");
 		}
 	},
 	REMOVE_WEB("remove web", CmdArgs.REMOVE_WEB_ARGS) {
 		@Override
 		public void printDoc() {
-			
+			line("remove web [-k keyword] [-i websiteId]");
+			line("Note:");
+			indent("while removing a website, you must specify the keyword or websiteId, or both for target removing website");
+			indent("before remove website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			line("remove web -k amazon -- remove a website by keyword 'amazon'");
+			line("remove web -i 13457927563219 -- remove a website by websiteId '13457927563219'");
 		}
 	},
 	CHANGE_WEB("change web", CmdArgs.CHANGE_WEB_ARGS) {
 		@Override
 		public void printDoc() {
-			
+			line("change web [-i websiteId] [-k keyword] [-u url]");
+			line("Note:");
+			indent("you can change the url by websiteId or keyword, or change the keyword and url by websiteId");
+			indent("before change website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			line("change web -i 13457927563219 -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by websiteId '13457927563219'");
+			line("change web -i 13457927563219 -k az -u 'www.amazon.cn' -- change a website keyword to 'az' "
+					+ "and url to 'www.amazon.cn' by websiteId '13457927563219'");
+			line("change web -k amazon -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by keyword 'amazon'");
 		}
 	},
 	QUERY_WEB("query web", CmdArgs.QUERY_WEB_ARGS) {
 		@Override
 		public void printDoc() {
-			
+			line("query web [-i websiteId] [-k keyword]");
+			line("Note:");
+			indent("you can query the website by websiteId or keyword, or both");
+			indent("before query website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			line("query web -i 13457927563219 -- query the website by websiteId '13457927563219'");
+			line("query web -k amazon -- query the website by keyword 'amazon'");
 		}
 	},
-	COUNT_WEB("count web", CmdArgs.COUNT_WEB_ARGS) {		// count web
+	COUNT_WEB("count web", CmdArgs.COUNT_WEB_ARGS) {
 		@Override
 		public void printDoc() {
-			
+			line("count web");
+			line("Note:");
+			indent("before count website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			line("count web -- count the number of website");
 		}
 	},
-	LIST_WEB("list web", CmdArgs.LIST_WEB_ARGS) {	// list web
+	LIST_WEB("list web", CmdArgs.LIST_WEB_ARGS) {
 		@Override
 		public void printDoc() {
-			
+			line("list web");
+			line("Note:");
+			indent("before list website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			line("list web -- list all the stored websites");
 		}
 	},
 	ADD_PWD("add pwd", CmdArgs.ADD_PWD_ARGS) {
@@ -225,7 +271,7 @@ public enum Cmd {
 			}else {
 				if(!isBeginWithSingleQuotes && Character.isWhitespace(ch)) {
 					if(begin < index) { wordList.add(commandLine.substring(begin, index)); }
-					// skip consecutive whitespaces
+					// skip consecutive whitespace
 					while(++index < length && Character.isWhitespace(commandLine.charAt(index)));
 					begin = index;
 					isBeginWithSingleQuotes = index < length && commandLine.charAt(index) == '\'';

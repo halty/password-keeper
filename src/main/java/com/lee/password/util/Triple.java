@@ -11,4 +11,8 @@ public class Triple<E1, E2, E3> {
 		this.second = second;
 		this.third = third;
 	}
+	
+	public static <E1, E2, E3> Triple<E1, E2, E3> create(E1 first, E2 second, E3 third) {
+		return new Triple<E1, E2, E3>(first, second, third);
+	}
 }

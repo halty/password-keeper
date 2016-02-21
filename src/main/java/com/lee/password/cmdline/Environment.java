@@ -1,5 +1,6 @@
 package com.lee.password.cmdline;
 
+import java.io.File;
 import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -43,30 +44,19 @@ public final class Environment {
 		PUBBLIC_KEY_DIR("pubKeyDir", "key directory for save/load public key file") {
 			@Override
 			public Pair<Boolean, String> checkValid(String value) {
-				// TODO Auto-generated method stub
-				return null;
+				if(value == null) { return Pair.create(false, name + " is null"); }
+				File dir = new File(value);
+				if(!dir.isDirectory()) { return Pair.create(false, "'" + value + "' is not a directory"); }
+				return Pair.create(true, "success");
 			}
 
 			@Override
 			public <T> Triple<Boolean, String, T> cast(Object value, Class<T> clazz) {
-				// TODO Auto-generated method stub
+				
 				return null;
 			}
 		},
 		PRIVATE_KEY_DIR("priKeyDir", "key directory for save/load private key file") {
-			@Override
-			public Pair<Boolean, String> checkValid(String value) {
-				// TODO Auto-generated method stub
-				return null;
-			}
-
-			@Override
-			public <T> Triple<Boolean, String, T> cast(Object value, Class<T> clazz) {
-				// TODO Auto-generated method stub
-				return null;
-			}
-		},
-		DATA_DIR("dataDir", "data directory for save/load password data file") {
 			@Override
 			public Pair<Boolean, String> checkValid(String value) {
 				// TODO Auto-generated method stub
@@ -93,8 +83,36 @@ public final class Environment {
 				return null;
 			}
 		},
+		DATA_DIR("dataDir", "data directory for save/load password data file") {
+			@Override
+			public Pair<Boolean, String> checkValid(String value) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public <T> Triple<Boolean, String, T> cast(Object value, Class<T> clazz) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+		},
+		IS_DATA_LOCK("isStoreLock", "lock the password data file or not ") {
+			@Override
+			public Pair<Boolean, String> checkValid(String value) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+
+			@Override
+			public <T> Triple<Boolean, String, T> cast(Object value,
+					Class<T> clazz) {
+				// TODO Auto-generated method stub
+				return null;
+			}
+		},
 		STORE_DRIVER("storeDriver", "store driver for manage website and password data, "
-				+ "specify implementation with class name") {
+				+ "specify implementation with class name",
+			PRIVATE_KEY_DIR, DATA_DIR, CRYPTO_DRIVER) {
 			@Override
 			public Pair<Boolean, String> checkValid(String value) {
 				// TODO Auto-generated method stub
@@ -112,10 +130,12 @@ public final class Environment {
 		
 		public final String name;
 		public final String desc;
+		private final Name[] dependencies;
 		
-		private Name(String name, String desc) {
+		private Name(String name, String desc, Name... dependencies) {
 			this.name = name;
 			this.desc = desc;
+			this.dependencies = dependencies;
 		}
 		
 		public abstract Pair<Boolean, String> checkValid(String value);
@@ -168,6 +188,8 @@ public final class Environment {
 		}
 		return name.cast(value, clazz);
 	}
+	
+	private boolean existVariable(Name name) { return variableMap.get(name) != null; }
 	
 	public List<Pair<Name, String>> getAllVariables() {
 		List<Pair<Name, String>> list = new ArrayList<Pair<Name, String>>(variableMap.size());

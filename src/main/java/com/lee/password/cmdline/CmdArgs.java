@@ -1,14 +1,24 @@
 package com.lee.password.cmdline;
 
 import java.io.File;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
 import com.lee.password.cmdline.Environment.Name;
+import com.lee.password.cmdline.commands.AddWebCommand;
+import com.lee.password.cmdline.commands.GenerateKeyCommand;
 import com.lee.password.cmdline.commands.HelpCommand;
 import com.lee.password.cmdline.commands.ListEnvCommand;
+import com.lee.password.cmdline.commands.RemoveWebCommand;
 import com.lee.password.cmdline.commands.SetCommand;
+import com.lee.password.util.Converter;
+import com.lee.password.util.Triple;
+
+import static com.lee.password.util.Converter.*;
+
 import com.lee.password.util.Pair;
 
 public enum CmdArgs {
@@ -32,6 +42,7 @@ public enum CmdArgs {
 			}
 		}
 	},
+	
 	LIST_ENV_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
@@ -40,6 +51,7 @@ public enum CmdArgs {
 					: Cmd.incorrectCommand("incorrect command arguments for 'list env' command");
 		}
 	},
+	
 	SET_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
@@ -66,69 +78,58 @@ public enum CmdArgs {
 			}
 		}
 	},
+	
+	@SuppressWarnings("unchecked")
 	GENERATE_KEY_ARGS(
-		pair("-s", INTEGER_CONVERTER),
-		pair("-p", FILE_CONVERTER)
+		triple("-s", true, INTEGER_CONVERTER),
+		triple("-p", true, DIR_CONVERTER)
 	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			int size = cmdArgsList.size();
-			if(size != 4) { return incorrectCommand("incorrect command arguments for 'generate key' command"); }
-			int keySize = -1;
-			File targetKeyDir = null;
-			String optionOne = cmdArgsList.get(0);
-			String valueOne = cmdArgsList.get(1);
-			String optionTwo = cmdArgsList.get(2);
-			String valueTwo = cmdArgsList.get(3);
-			if(matchOption(optionOne, "s")) {
-				Pair<Boolean, Integer> keySizeResult = parseInt(valueOne);
-				if(!keySizeResult.first || keySizeResult.second <= 0) {
-					return Cmd.incorrectCommand("incorrect keySize for 'generate key' command: "+valueOne);
-				}
-				keySize = keySizeResult.second;
-				if(matchOption(optionTwo, "p")) {
-					Pair<Boolean, File> keyDirResult = parseDir(valueTwo);
-					if(!keyDirResult.first) {
-						return Cmd.incorrectCommand("incorrect targetKeyDir for 'generate key' command: "+valueTwo);
-					}
-					targetKeyDir = keyDirResult.second;
-				}else {
-					return Cmd.incorrectCommand("incorrect argument option for 'generate key' command: "+optionTwo);
-				}
-			}else {
-				if(matchOption(optionOne, "p")) {
-					Pair<Boolean, File> keyDirResult = parseDir(valueOne);
-					if(!keyDirResult.first) {
-						return Cmd.incorrectCommand("incorrect targetKeyDir for 'generate key' command: "+valueOne);
-					}
-					targetKeyDir = keyDirResult.second;
-					if(matchOption(optionTwo, "s")) {
-						Pair<Boolean, Integer> keySizeResult = parseInt(valueTwo);
-						if(!keySizeResult.first || keySizeResult.second <= 0) {
-							return Cmd.incorrectCommand("incorrect keySize for 'generate key' command: "+valueTwo);
-						}
-						keySize = keySizeResult.second;
-					}else {
-						return Cmd.incorrectCommand("incorrect argument option for 'generate key' command: "+optionTwo);
-					}
-				}else {
-					return Cmd.incorrectCommand("incorrect argument option for 'generate key' command: "+optionOne);
-				}
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.GENERATE_KEY, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Integer> keyTriple = parseArgsValue(Cmd.GENERATE_KEY, triple.third, "-s", Integer.class);
+			if(!keyTriple.first) { return Cmd.incorrectCommand(keyTriple.second); }
+			Triple<Boolean, String, File> dirTriple = parseArgsValue(Cmd.GENERATE_KEY, triple.third, "-p", File.class);
+			if(!dirTriple.first) { return Cmd.incorrectCommand(dirTriple.second); }
+			return new GenerateKeyCommand(keyTriple.third, dirTriple.third);
+		}
+	},
+	
+	@SuppressWarnings("unchecked")
+	ADD_WEB_ARGS(
+		triple("-k", true, STRING_CONVERTER),
+		triple("-u", true, STRING_CONVERTER)
+	) {
+		@Override
+		public Command parse(List<String> cmdArgsList) {
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.ADD_WEB, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, String> keywordTriple = parseArgsValue(Cmd.ADD_WEB, triple.third, "-k", String.class);
+			if(!keywordTriple.first) { return Cmd.incorrectCommand(keywordTriple.second); }
+			Triple<Boolean, String, String> urlTriple = parseArgsValue(Cmd.ADD_WEB, triple.third, "-u", String.class);
+			if(!urlTriple.first) { return Cmd.incorrectCommand(urlTriple.second); }
+			return new AddWebCommand(keywordTriple.third, urlTriple.third);
+		}
+	},
+	
+	@SuppressWarnings("unchecked")
+	REMOVE_WEB_ARGS(
+		triple("-k", false, STRING_CONVERTER),
+		triple("-i", false, LONG_CONVERTER)
+	) {
+		@Override
+		public Command parse(List<String> cmdArgsList) {
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.REMOVE_WEB, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, String> keywordTriple = parseArgsValue(Cmd.REMOVE_WEB, triple.third, "-k", String.class);
+			String keyword = keywordTriple.third;
+			Triple<Boolean, String, Long> webisteIdTriple = parseArgsValue(Cmd.REMOVE_WEB, triple.third, "-i", Long.class);
+			Long websiteId = webisteIdTriple.third;
+			if(keyword == null && websiteId == null) {
+				return Cmd.incorrectCommand("while removing website, no keyword and websiteId are specified");
 			}
-		}
-	},
-	ADD_WEB_ARGS() {
-		@Override
-		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
-		}
-	},
-	REMOVE_WEB_ARGS() {
-		@Override
-		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			return new RemoveWebCommand(websiteId, keyword);
 		}
 	},
 	CHANGE_WEB_ARGS() {
@@ -231,42 +232,85 @@ public enum CmdArgs {
 	},
 	;
 	
-	private final Map<String, Converter> map = new HashMap<String, Converter>();
+	private final Map<String, Pair<Boolean, Converter<?>>> converterMap = new HashMap<String, Pair<Boolean, Converter<?>>>();
 	
-	private CmdArgs(Pair<String, Converter>... argsConverterPairs) {
-		for(Pair<String, Converter> pair : argsConverterPairs) {
-			map.put(pair.first, pair.second);
+	private CmdArgs(Triple<String, Boolean, Converter<?>>... argsConverterTriples) {
+		for(Triple<String, Boolean, Converter<?>> triple : argsConverterTriples) {
+			converterMap.put(triple.first, pair(triple.second, triple.third));
 		}
 	}
 	
 	public abstract Command parse(List<String> cmdArgsList);
 	
-	static interface Converter<T> { public T convert(String value); }
-	
-	private static final Converter<Integer> INTEGER_CONVERTER = new Converter<Integer>() {
-		@Override
-		public Integer convert(String value) {
-			try {
-				return Integer.parseInt(value);
-			}catch(Exception e) {
-				return null;
+	protected Triple<Boolean, String, Map<String, Object>> parseArgs(Cmd cmd, List<String> cmdArgsList) {
+		int size = cmdArgsList.size();
+		if(size == 0) {
+			Map<String, Object> emptyValueMap = Collections.emptyMap();
+			return Triple.create(true, "success", emptyValueMap);
+		}
+		if(size % 2 != 0) {
+			return Triple.create(false, "the number of '" + cmd.name() + "' command argument must be an even", null);
+		}
+		
+		Map<String, Object> valueMap = new HashMap<String, Object>(converterMap.size());
+		Iterator<String> iterator = cmdArgsList.iterator();
+		while(iterator.hasNext()) {
+			String option = iterator.next();
+			String value = iterator.next();
+			Pair<Boolean, Converter<?>> pair = converterMap.get(option);
+			if(pair == null) {
+				return Triple.create(false, "unrecognized argument option '" + option
+					+ "' for '" + cmd.name() + "' command", null);
+			}
+			Object argsValue = pair.second.convert(value);
+			if(argsValue == null) {
+				return Triple.create(false, "illeagl argument value '" + value + "' mapped with option '" + option
+						+ "' for '" + cmd.name() + "' command", null);
+			}
+			Object oldArgsValue = valueMap.put(option, argsValue);
+			if(oldArgsValue != null) {
+				return Triple.create(false, "duplicate argument value '" + value + "' mapped with option '" + option
+						+ "' for '" + cmd.name() + "' command", null);
 			}
 		}
-	};
+		return Triple.create(true, "success", valueMap);
+	}
 	
-	private static final Converter<File> FILE_CONVERTER = new Converter<File>() {
-		@Override
-		public File convert(String value) {
-			try {
-				File dir = new File(value);
-				return dir.isDirectory() ? dir : null;
-			}catch(Exception e) {
-				return null;
+	protected <T> Triple<Boolean, String, T> parseArgsValue(Cmd cmd, Map<String, Object> argsValueMap, String argsOption, Class<T> clazz) {
+		Object value = argsValueMap.get(argsOption);
+		if(value == null) {
+			Pair<Boolean, Converter<?>> pair = converterMap.get(argsOption);
+			if(pair.first) {
+				return Triple.create(false, "no mapping value of required '"+ argsOption + "' option for '"
+					+ cmd.name() + "' command", null);
+			}else {
+				return Triple.create(true, "'"+ argsOption + "' option is optional for '"
+						+ cmd.name() + "' command", null);
 			}
 		}
-	};
+		if(!clazz.isInstance(value)) {
+			return Triple.create(false, "illegal value format of '"+ argsOption + "' option for '"
+					+ cmd.name() + "' command: "+value, null);
+		}
+		return Triple.create(true, "success", clazz.cast(value));
+	}
 	
-	private static <T> Pair<String, Converter> pair(String args, Converter<T> converter) {
-		return new Pair<String, Converter>(args, converter);
+	protected boolean exist(Map<String, Object> argsValueMap, String argsOption) {
+		return argsValueMap.get(argsOption) != null;
+	}
+	
+	/**
+	 * build a command argument triple tuple
+	 * @param args	the first string element denoted argument option name
+	 * @param isRequired the second boolean element denoted whether argument option is required or not 
+	 * @param converter the third {@link Converter} element denoted the value converter
+	 * @return a command argument triple tuple
+	 */
+	private static Triple<String, Boolean, Converter<?>> triple(String args, Boolean isRequired, Converter<?> converter) {
+		return new Triple<String, Boolean, Converter<?>>(args, isRequired, converter);
+	}
+	
+	private static Pair<Boolean, Converter<?>> pair(Boolean isOptional, Converter<?> converter) {
+		return new Pair<Boolean, Converter<?>>(isOptional, converter);
 	}
 }
