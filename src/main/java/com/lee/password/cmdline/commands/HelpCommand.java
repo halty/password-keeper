@@ -8,15 +8,18 @@ public class HelpCommand implements Command {
 
 	private final Cmd cmd;
 	private final boolean areAll;
+	private final boolean isOnlySynopsis;
 	
-	public HelpCommand() {
+	public HelpCommand(boolean isOnlySynopsis) {
 		this.areAll = true;
+		this.isOnlySynopsis = isOnlySynopsis;
 		this.cmd = null;
 	}
 	
 	public HelpCommand(Cmd cmd) {
 		this.areAll = false;
-		this.cmd = null;
+		this.isOnlySynopsis = false;
+		this.cmd = cmd;
 	}
 	
 	@Override
@@ -24,9 +27,17 @@ public class HelpCommand implements Command {
 		if(areAll) {
 			Cmd[] cmds = Cmd.values();
 			int index = 0;
-			for(Cmd cmd : cmds) {
-				cmd.printDoc();
-				if(++index < cmds.length) { newLine(); }
+			if(isOnlySynopsis) {
+				line("All supported commands:");
+				newLine();
+				for(Cmd cmd : cmds) { cmd.printSynopsis(); }
+			}else {
+				line("All supported command details:");
+				newLine();
+				for(Cmd cmd : cmds) {
+					cmd.printDoc();
+					if(++index < cmds.length) { newLine(); }
+				}
 			}
 		}else {
 			cmd.printDoc();

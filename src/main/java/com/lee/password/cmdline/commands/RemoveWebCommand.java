@@ -5,7 +5,6 @@ import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
 import com.lee.password.cmdline.Command;
-import com.lee.password.cmdline.Environment.Name;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
@@ -23,7 +22,7 @@ public class RemoveWebCommand implements Command {
 	
 	@Override
 	public void execute() {
-		Triple<Boolean, String, StoreDriver> result = current().getVariable(Name.STORE_DRIVER, StoreDriver.class);
+		Triple<Boolean, String, StoreDriver> result = current().getStoreDriver();
 		if(!result.first) {
 			line(result.second);
 		}else {

@@ -4,13 +4,13 @@ import static com.lee.password.cmdline.Environment.current;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
-import com.lee.password.cmdline.Cmd;
 import com.lee.password.cmdline.Command;
+import com.lee.password.keeper.api.Entity;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.util.Triple;
 
-public class CountWebCommand implements Command {
+public class RedoCommand implements Command {
 
 	@Override
 	public void execute() {
@@ -19,12 +19,11 @@ public class CountWebCommand implements Command {
 			line(result.second);
 		}else {
 			StoreDriver storeDriver = result.third;
-			Result<Integer> countResult = storeDriver.websiteCount();
-			if(!countResult.isSuccess()) {
-				line("failed to count the number of website: "+countResult.msg);
+			Result<Entity> redoResult = storeDriver.redo();
+			if(!redoResult.isSuccess()) {
+				line("failed to redo the last undo change: "+redoResult.msg);
 			}else {
-				line("the number of webiste: "+countResult.result);
-				line("you can run '" + Cmd.LIST_WEB.cmd() + "' command see more details");
+				line("success to redo the last undo '"+redoResult.result.type()+"' change");
 			}
 		}
 		prompt();

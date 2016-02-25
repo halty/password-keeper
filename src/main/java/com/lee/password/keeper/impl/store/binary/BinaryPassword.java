@@ -190,7 +190,7 @@ public class BinaryPassword implements InternalEntity {
 		return password;
 	}
 	
-	public Password transformWithoutSecret() { return new Password(websiteId, username()); }
+	public Password transformWithoutSecret() { return new Password(websiteId, username(), timestamp); }
 
 	public long websiteId() { return websiteId; }
 

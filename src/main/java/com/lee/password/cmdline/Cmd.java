@@ -16,10 +16,16 @@ public enum Cmd {
 
 	HELP("help", CmdArgs.HELP_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("help [-h] [-s] [cmd]");
+		}
+		@Override
 		public void printDoc() {
-			line("help [cmd]");
+			printSynopsis();
 			line("Use examples:");
 			indent("help -- show all the command documents");
+			indent("help -s -- show all the command synopsises");
+			indent("help -h -- show the help info of 'help' command");
 			indent("help set -- show the 'set' command documents");
 			indent("help generate key -- show the 'generate key' command documents");
 		}
@@ -27,19 +33,29 @@ public enum Cmd {
 	
 	LIST_ENV("list env", CmdArgs.LIST_ENV_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("list env [-h]");
+		}
+		@Override
 		public void printDoc() {
-			line("list env");
+			printSynopsis();
 			line("Use examples:");
 			indent("list env -- list all the customizable program environment variable names");
+			indent("list env -h -- show the help info of 'list env' command");
 		}
 	},
 	
 	SET("set", CmdArgs.SET_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("set [-h] [key value]");
+		}
+		@Override
 		public void printDoc() {
-			line("set [key value]");
+			printSynopsis();
 			line("Use examples:");
 			indent("set -- show all the program environment variables");
+			indent("set -h -- show the help info of 'set' command");
 			indent("set keyDir -- show the program environment variable value named with 'keyDir'");
 			indent("set keyDir /User/key -- set the program environment variable 'keyDir' of value '/User/key'");
 		}
@@ -47,154 +63,324 @@ public enum Cmd {
 	
 	GENERATE_KEY("generate key", CmdArgs.GENERATE_KEY_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("generate key [-h] -s keySize -p targetKeyDir");
+		}
+		@Override
 		public void printDoc() {
-			line("generate key -s keySize -p targetKeyDir");
+			printSynopsis();
 			line("Note:");
 			indent("before generate key, you must specify variable named with '" + Name.CRYPTO_DRIVER.name + "'");
 			indent("the generated key depend on specific implementation, default is '"
 					+ RSACryptoDriver.class.getName() + "'");
 			line("Use examples:");
-			line("generate key -s 1024 -p '/User/key' -- genearte key with 1024 bits and save them to directory '/User/key'");
+			indent("generate key -h -- show the help info of 'generate key' command");
+			indent("generate key -s 1024 -p '/User/key' -- genearte key with 1024 bits and save them to directory '/User/key'");
 		}
 	},
+	
 	ADD_WEB("add web", CmdArgs.ADD_WEB_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("add web [-h] -k keyword -u url");
+		}
+		@Override
 		public void printDoc() {
-			line("add web -k keyword -u url");
+			printSynopsis();
 			line("Note:");
 			indent("before add website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
 			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
-			line("add web -k amazon -u 'www.amazon.com' -- add 'amazon' website with url 'www.amazon.com'");
+			indent("add web -h -- show the help info of 'add web' command");
+			indent("add web -k amazon -u 'www.amazon.com' -- add 'amazon' website with url 'www.amazon.com'");
 		}
 	},
+	
 	REMOVE_WEB("remove web", CmdArgs.REMOVE_WEB_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("remove web [-h] [-k keyword] [-i websiteId]");
+		}
+		@Override
 		public void printDoc() {
-			line("remove web [-k keyword] [-i websiteId]");
+			printSynopsis();
 			line("Note:");
 			indent("while removing a website, you must specify the keyword or websiteId, or both for target removing website");
 			indent("before remove website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
 			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
-			line("remove web -k amazon -- remove a website by keyword 'amazon'");
-			line("remove web -i 13457927563219 -- remove a website by websiteId '13457927563219'");
+			indent("remove web -h -- show the help info of 'remove web' command");
+			indent("remove web -k amazon -- remove a website by keyword 'amazon'");
+			indent("remove web -i 13457927563219 -- remove a website by websiteId '13457927563219'");
 		}
 	},
+	
 	CHANGE_WEB("change web", CmdArgs.CHANGE_WEB_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("change web [-h] [-i websiteId] [-k keyword] [-u url]");
+		}
+		@Override
 		public void printDoc() {
-			line("change web [-i websiteId] [-k keyword] [-u url]");
+			printSynopsis();
 			line("Note:");
 			indent("you can change the url by websiteId or keyword, or change the keyword and url by websiteId");
 			indent("before change website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
 			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
-			line("change web -i 13457927563219 -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by websiteId '13457927563219'");
-			line("change web -i 13457927563219 -k az -u 'www.amazon.cn' -- change a website keyword to 'az' "
+			indent("change web -h -- show the help info of 'change web' command");
+			indent("change web -i 13457927563219 -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by websiteId '13457927563219'");
+			indent("change web -i 13457927563219 -k az -u 'www.amazon.cn' -- change a website keyword to 'az' "
 					+ "and url to 'www.amazon.cn' by websiteId '13457927563219'");
-			line("change web -k amazon -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by keyword 'amazon'");
+			indent("change web -k amazon -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by keyword 'amazon'");
 		}
 	},
+	
 	QUERY_WEB("query web", CmdArgs.QUERY_WEB_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("query web [-h] [-i websiteId] [-k keyword]");
+		}
+		@Override
 		public void printDoc() {
-			line("query web [-i websiteId] [-k keyword]");
+			printSynopsis();
 			line("Note:");
 			indent("you can query the website by websiteId or keyword, or both");
 			indent("before query website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
 			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
-			line("query web -i 13457927563219 -- query the website by websiteId '13457927563219'");
-			line("query web -k amazon -- query the website by keyword 'amazon'");
+			indent("query web -h -- show the help info of 'query web' command");
+			indent("query web -i 13457927563219 -- query the website by websiteId '13457927563219'");
+			indent("query web -k amazon -- query the website by keyword 'amazon'");
 		}
 	},
+	
 	COUNT_WEB("count web", CmdArgs.COUNT_WEB_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("count web [-h]");
+		}
+		@Override
 		public void printDoc() {
-			line("count web");
+			printSynopsis();
 			line("Note:");
 			indent("before count website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
 			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
-			line("count web -- count the number of website");
+			indent("count web -- count the number of website");
+			indent("count web -h -- show the help info of 'count web' command");
 		}
 	},
+	
 	LIST_WEB("list web", CmdArgs.LIST_WEB_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("list web [-h]");
+		}
+		@Override
 		public void printDoc() {
-			line("list web");
+			printSynopsis();
 			line("Note:");
 			indent("before list website, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
 			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
-			line("list web -- list all the stored websites");
+			indent("list web -- list all the stored websites");
+			indent("list web -h -- show the help info of 'list web' command");
 		}
 	},
+	
 	ADD_PWD("add pwd", CmdArgs.ADD_PWD_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("add pwd [-h] -i websiteId -n username -p password [-m memo]");
+		}
+		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before add password, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("add pwd -h -- show the help info of 'add pwd' command");
+			indent("add pwd -i 13457927563219 -n 'peter' -p 123456 -- add username 'peter' and password '123456' to website which id is '13457927563219'");
+			indent("add pwd -i 13457927563219 -n 'julia' -p 234567 -m 'payCode=love' -- add username 'julia' and password '234567' "
+					+ "with memo 'payCode=love' to website which id is '13457927563219'");
 		}
 	},
+	
 	REMOVE_PWD("remove pwd", CmdArgs.REMOVE_PWD_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("remove pwd [-h] -i websiteId -n username");
+		}
+		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before remove password, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("remove pwd -h -- show the help info of 'remove pwd' command");
+			indent("remove pwd -i 13457927563219 -n 'peter' -- remove password by username 'peter' from website which id is '13457927563219'");
 		}
 	},
+	
 	CHANGE_PWD("change pwd", CmdArgs.CHANGE_PWD_ARGS) {
 		@Override
+		public void printSynopsis() {
+			line("change pwd [-h] -i websiteId -n username [-p password] [-m memo]");
+		}
+		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before change password, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("change pwd -h -- show the help info of 'change pwd' command");
+			indent("change pwd -i 13457927563219 -n 'peter' -p 987654 -- change password to '987654' by username 'peter' from website which id is '13457927563219'");
+			indent("change pwd -i 13457927563219 -n 'julia' -m 'payCode=hate' -- change password memo to 'payCode=hate' by username 'julia' "
+					+ "from website which id is '13457927563219'");
+			indent("change pwd -i 13457927563219 -n 'julia' -p 876543 -m 'payCode=hate' -- change password to '987654' and memo to 'payCode=hate' by username 'julia' "
+					+ "from website which id is '13457927563219'");
 		}
 	},
+	
 	QUERY_PWD("query pwd", CmdArgs.QUERY_PWD_ARGS) {
 		@Override
-		public void printDoc() {
-			
+		public void printSynopsis() {
+			line("query pwd [-h] -i websiteId -n username");
 		}
-	},
-	COUNT_PWD("count pwd", CmdArgs.COUNT_PWD_ARGS) {		// count pwd, count pwd websiteId, count pwd username
 		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before query password, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("query pwd -h -- show the help info of 'query pwd' command");
+			indent("query pwd -i 13457927563219 -n 'peter' -- query password by username 'peter' from website which id is '13457927563219'");
 		}
 	},
-	LIST_PWD("list pwd", CmdArgs.LIST_PWD_ARGS) {	// list pwd websiteId, list pwd username
+	
+	COUNT_PWD("count pwd", CmdArgs.COUNT_PWD_ARGS) {
+		@Override
+		public void printSynopsis() {
+			line("count pwd [-h] [-i websiteId] [-n username]");
+		}
 		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before count password, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("count pwd -- count the total number of password");
+			indent("count pwd -h -- show the help info of 'count pwd' command");
+			indent("count pwd -i 13457927563219 -- count the number of password from website which id is '13457927563219'");
+			indent("count pwd -n 'peter' -- count the number of password by username 'peter'");
+			indent("count pwd -i 13457927563219 -n 'peter' -- count the number of password by username 'peter' "
+					+ "from website which id is '13457927563219'");
 		}
 	},
-	UNDO("undo", CmdArgs.UNDO_ARGS) {		// undo
+	
+	LIST_PWD("list pwd", CmdArgs.LIST_PWD_ARGS) {
+		@Override
+		public void printSynopsis() {
+			line("list pwd [-h] [-i websiteId] [-n username]");
+		}
 		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before list password, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("list pwd -h -- show the help info of 'list pwd' command");
+			indent("list pwd -i 13457927563219 -- list passwords from website which id is '13457927563219'");
+			indent("list pwd -n 'peter' -- list passwords by username 'peter'");
+			indent("list pwd -i 13457927563219 -n 'peter' -- list passwords by username 'peter' from website which id is '13457927563219'");
 		}
 	},
-	REDO("redo", CmdArgs.REDO_ARGS) {		// redo
+	
+	UNDO("undo", CmdArgs.UNDO_ARGS) {
+		@Override
+		public void printSynopsis() {
+			line("undo [-h]");
+		}
 		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before undo, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("undo -- undo the last uncommitted change operation");
+			indent("undo -h -- show the help info of 'undo' command");
 		}
 	},
-	COMMIT("commit", CmdArgs.COMMIT_ARGS) {		// commit
+	
+	REDO("redo", CmdArgs.REDO_ARGS) {
+		@Override
+		public void printSynopsis() {
+			line("redo [-h]");
+		}
 		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before redo, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("redo -- redo the last undo change operation");
+			indent("redo -h -- show the help info of 'redo' command");
 		}
 	},
-	EXIT("exit", CmdArgs.EXIT_ARGS) {		// exit
+	
+	COMMIT("commit", CmdArgs.COMMIT_ARGS) {
+		@Override
+		public void printSynopsis() {
+			line("commit [-h]");
+		}
 		@Override
 		public void printDoc() {
-			
+			printSynopsis();
+			line("Note:");
+			indent("before commit, you must specify variables '" + Name.CRYPTO_DRIVER.name + "' and '" + Name.STORE_DRIVER.name + "'");
+			indent("default '" + Name.CRYPTO_DRIVER.name + "' implementation is '" + RSACryptoDriver.class.getName() + "'");
+			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
+			line("Use examples:");
+			indent("commit -- commit all the change operation since the last commit operation, if commit success, all the change "
+					+ "will be flush to underlying storage, and can not be undo by '"+UNDO.cmd()+"' command");
+			indent("commit -h -- show the help info of 'commit' command");
+		}
+	},
+	
+	EXIT("exit", CmdArgs.EXIT_ARGS) {
+		@Override
+		public void printSynopsis() {
+			line("exit [-h]");
+		}
+		@Override
+		public void printDoc() {
+			printSynopsis();
+			line("Use examples:");
+			indent("exit -- releases any associated system resources and exit");
+			indent("exit -h -- show the help info of 'exit' command");
 		}
 	},
 	;
@@ -217,6 +403,9 @@ public enum Cmd {
 	public String cmd() { return cmd; }
 	
 	public Command parse(List<String> cmdArgsList) { return cmdArgs.parse(cmdArgsList); }
+	
+	/** print command synopsis to standard output stream **/
+	public abstract void printSynopsis();
 	
 	/** print command document to standard output stream **/
 	public abstract void printDoc();

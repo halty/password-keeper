@@ -96,14 +96,14 @@ public class BinaryStoreDriver implements StoreDriver {
 	/** closed flag **/
 	private boolean isClosed;
 	
-	public BinaryStoreDriver(String dataDir, CryptoDriver cryptoDriver, int secretBlockSize, boolean lockStoreFile) {
+	public BinaryStoreDriver(String dataDir, CryptoDriver cryptoDriver, int secretBlockSize, boolean isStoreFileLock) {
 		try {
 			this.secretBlockSize = secretBlockSize;
 			this.cryptoDriver = cryptoDriver;
 			this.storePath = createIfNotExisted(dataDir);
 			this.storeMappedFile = new RandomAccessFile(storePath, "rw");
 			this.storeChannel = storeMappedFile.getChannel();
-			if(lockStoreFile) { this.storeLock = storeChannel.lock(); }
+			if(isStoreFileLock) { this.storeLock = storeChannel.lock(); }
 			
 			init();
 		}catch(Exception e) {
@@ -652,7 +652,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 
 	@Override
-	public Result<Password.Header> insertPassword(Password entry, CryptoKey encryptKey) {
+	public Result<Password.Header> insertPassword(Password entry, CryptoKey encryptionKey) {
 		BinaryPassword biPassword = null;
 		try {
 			Result<BinaryWebsite> biWebsiteResult = selectBy(entry.header().websiteId());
@@ -663,7 +663,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			if(biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(Code.FAIL, "an existed entry mapping for this header");
 			}
-			biPasswordResult = encrypt(entry, encryptKey, true);
+			biPasswordResult = encrypt(entry, encryptionKey, true);
 			if(!biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(biPasswordResult.code, biPasswordResult.msg);
 			}
@@ -679,7 +679,7 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 	}
 	
-	private Result<BinaryPassword> encrypt(Password password, CryptoKey encryptKey, boolean forInsert) {
+	private Result<BinaryPassword> encrypt(Password password, CryptoKey encryptionKey, boolean forInsert) {
 		Password.Header header = password.header();
 		Password.Secret secret = password.secret();
 		String pwd = secret.password();
@@ -689,7 +689,7 @@ public class BinaryStoreDriver implements StoreDriver {
 		if(pwd == null || pwd.isEmpty()) {
 			if(forInsert) { return new Result<BinaryPassword>(Code.FAIL, "pasword is empty"); }
 		}else {
-			Result<byte[]> encryptedResult = cryptoDriver.encrypt(pwd.getBytes(CHARSET), encryptKey);
+			Result<byte[]> encryptedResult = cryptoDriver.encrypt(pwd.getBytes(CHARSET), encryptionKey);
 			if(!encryptedResult.isSuccess()) {
 				return new Result<BinaryPassword>(Code.FAIL, "password encrypt failed: "+encryptedResult.msg);
 			}
@@ -699,7 +699,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			if(!forInsert) { return new Result<BinaryPassword>(Code.SUCCESS, "success", biPassword); }
 			kvp = "";
 		}
-		Result<byte[]> encryptedResult = cryptoDriver.encrypt(kvp.getBytes(CHARSET), encryptKey);
+		Result<byte[]> encryptedResult = cryptoDriver.encrypt(kvp.getBytes(CHARSET), encryptionKey);
 		if(!encryptedResult.isSuccess()) {
 			return new Result<BinaryPassword>(Code.FAIL, "key value pair encrypt failed: "+encryptedResult.msg);
 		}
@@ -819,7 +819,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 
 	@Override
-	public Result<Password.Header> updatePassword(Password entry, CryptoKey encryptKey) {
+	public Result<Password.Header> updatePassword(Password entry, CryptoKey encryptionKey) {
 		BinaryPassword newPassword = null;
 		BinaryPassword oldPassword = null;
 		BinaryPassword existedPassword = null;
@@ -829,7 +829,7 @@ public class BinaryStoreDriver implements StoreDriver {
 				return new Result<Password.Header>(Code.FAIL, biPasswordResult.msg);
 			}
 			existedPassword = biPasswordResult.result;
-			biPasswordResult = encrypt(entry, encryptKey, false);
+			biPasswordResult = encrypt(entry, encryptionKey, false);
 			if(!biPasswordResult.isSuccess()) {
 				return new Result<Password.Header>(biPasswordResult.code, biPasswordResult.msg);
 			}
@@ -878,12 +878,12 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 
 	@Override
-	public Result<Password> selectPassword(Password.Header header, CryptoKey decryptKey) {
+	public Result<Password> selectPassword(Password.Header header, CryptoKey decryptionKey) {
 		Result<BinaryPassword> result = selectBy(header);
 		if(!result.isSuccess()) {
 			return new Result<Password>(Code.FAIL, result.msg);
 		}
-		return decrypt(result.result, decryptKey);
+		return decrypt(result.result, decryptionKey);
 	}
 	
 	private Result<BinaryPassword> selectBy(Password.Header header) {
@@ -899,15 +899,15 @@ public class BinaryStoreDriver implements StoreDriver {
 				new Result<BinaryPassword>(Code.SUCCESS, "success", biPassword);
 	}
 	
-	private Result<Password> decrypt(BinaryPassword biPassword, CryptoKey decryptKey) {
-		Password password = new Password(biPassword.websiteId(), biPassword.username());
+	private Result<Password> decrypt(BinaryPassword biPassword, CryptoKey decryptionKey) {
+		Password password = new Password(biPassword.websiteId(), biPassword.username(), biPassword.timestamp());
 		
-		Result<byte[]> decryptedResult = cryptoDriver.decrypt(biPassword.encryptedPassword(), decryptKey);
+		Result<byte[]> decryptedResult = cryptoDriver.decrypt(biPassword.encryptedPassword(), decryptionKey);
 		if(!decryptedResult.isSuccess()) {
 			return new Result<Password>(Code.FAIL, "password decrypt failed: "+decryptedResult.msg);
 		}
 		password.password(new String(decryptedResult.result, CHARSET));
-		decryptedResult = cryptoDriver.decrypt(biPassword.encryptedKeyValuePairs(), decryptKey);
+		decryptedResult = cryptoDriver.decrypt(biPassword.encryptedKeyValuePairs(), decryptionKey);
 		if(!decryptedResult.isSuccess()) {
 			return new Result<Password>(Code.FAIL, "key value pair decrypt failed: "+decryptedResult.msg);
 		}
@@ -933,6 +933,12 @@ public class BinaryStoreDriver implements StoreDriver {
 		int count = biPasswordList == null ? 0 : biPasswordList.size();
 		return new Result<Integer>(Code.SUCCESS, "success", count);
 	}
+	
+	@Override
+	public Result<Integer> passwordCount(long websiteId, String username) {
+		boolean isExisted = passwordMap.containsKey(new PasswordKey(websiteId, username));
+		return new Result<Integer>(Code.SUCCESS, "success", isExisted ? 1 : 0);
+	}
 
 	@Override
 	public Result<List<Password.Header>> listPassword(long websiteId) {
@@ -942,7 +948,7 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 		List<Password.Header> list = new ArrayList<Password.Header>(biPasswordList.size());
 		for(BinaryPassword biPassword : biPasswordList) {
-			Password.Header header = new Password.Header(biPassword.websiteId(), biPassword.username());
+			Password.Header header = new Password.Header(biPassword.websiteId(), biPassword.username(), biPassword.timestamp());
 			list.add(header);
 		}
 		return new Result<List<Password.Header>>(Code.SUCCESS, "success", list);
@@ -956,10 +962,20 @@ public class BinaryStoreDriver implements StoreDriver {
 		}
 		List<Password.Header> list = new ArrayList<Password.Header>(biPasswordList.size());
 		for(BinaryPassword biPassword : biPasswordList) {
-			Password.Header header = new Password.Header(biPassword.websiteId(), biPassword.username());
+			Password.Header header = new Password.Header(biPassword.websiteId(), biPassword.username(), biPassword.timestamp());
 			list.add(header);
 		}
 		return new Result<List<Password.Header>>(Code.SUCCESS, "success", list);
+	}
+	
+	@Override
+	public Result<Password.Header> listPassword(long websiteId, String username) {
+		BinaryPassword biPassword = passwordMap.get(new PasswordKey(websiteId, username));
+		if(biPassword == null) {
+			return new Result<Password.Header>(Code.FAIL, "no password mapping with websiteId and username");
+		}
+		return new Result<Password.Header>(Code.SUCCESS, "success",
+				new Password.Header(biPassword.websiteId(), biPassword.username(), biPassword.timestamp()));
 	}
 	
 	@Override
@@ -971,7 +987,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	public Result<Entity> undo() {
 		ChangedOperation<? extends InternalEntity> changeOperation = undoQueue.pollLast();
 		if(changeOperation == null) {
-			return new Result<Entity>(Code.FAIL, "no history change operation afater last flush");
+			return new Result<Entity>(Code.FAIL, "no history change operation afater last commit");
 		}
 		
 		OP op = changeOperation.op();
@@ -981,7 +997,7 @@ public class BinaryStoreDriver implements StoreDriver {
 		case UPDATE: return undoUpdate(changeOperation);
 		default:
 			undoQueue.offer(changeOperation);
-			return new Result<Entity>(Code.FAIL, "unsupported op type of last changed operation: "+op);
+			return new Result<Entity>(Code.FAIL, "unsupported op type of last change operation: "+op);
 		}
 	}
 	
@@ -1183,12 +1199,12 @@ public class BinaryStoreDriver implements StoreDriver {
 	}
 	
 	@Override
-	public Result<Integer> needFlushCount() {
+	public Result<Integer> needCommitCount() {
 		return new Result<Integer>(Code.SUCCESS, "success", undoQueue.size());
 	}
 
 	@Override
-	public Result<Throwable> flush() {
+	public Result<Throwable> commit() {
 		ChangedOperation<? extends InternalEntity> first = null;
 		int toBeFlushedCount = undoQueue.size();
 		try {
@@ -1209,7 +1225,7 @@ public class BinaryStoreDriver implements StoreDriver {
 							writeInsertPassword((BinaryPassword) inserted);
 						}
 					}catch(Exception e) {
-						return new Result<Throwable>(Code.FAIL, "flush insert internal error", e);
+						return new Result<Throwable>(Code.FAIL, "commit insert internal error", e);
 					}
 					break;
 				case DELETE:
@@ -1221,7 +1237,7 @@ public class BinaryStoreDriver implements StoreDriver {
 							writeDeletePassword((BinaryPassword) deleted);
 						}
 					}catch(Exception e) {
-						return new Result<Throwable>(Code.FAIL, "flush delete internal error", e);
+						return new Result<Throwable>(Code.FAIL, "commit delete internal error", e);
 					}
 					break;
 				case UPDATE:
@@ -1234,22 +1250,22 @@ public class BinaryStoreDriver implements StoreDriver {
 							writeUpdatePassword((BinaryPassword) before, (BinaryPassword) after);
 						}
 					}catch(Exception e) {
-						return new Result<Throwable>(Code.FAIL, "flush update internal error", e);
+						return new Result<Throwable>(Code.FAIL, "commit update internal error", e);
 					}
 					break;
 				default:
 					undoQueue.offerFirst(first);
-					return new Result<Throwable>(Code.FAIL, "unsupported op type of flush operation: "+op);
+					return new Result<Throwable>(Code.FAIL, "unsupported op type of commit operation: "+op);
 				}
 				// just for test
-				try { flushChanged(); }catch(IOException e) { throw new StoreException("flush changed failed", e); }
+				try { flushChanged(); }catch(IOException e) { throw new StoreException("commit change failed", e); }
 			}
 			return new Result<Throwable>(Code.SUCCESS, "success");
 		}finally {
 			try {
 				if(undoQueue.size() < toBeFlushedCount) { flushChanged(); }
 			}catch(IOException e) {
-				return new Result<Throwable>(Code.FAIL, "failed to force flush changed to store path: "+storePath, e);
+				return new Result<Throwable>(Code.FAIL, "failed to force commit change to store path: "+storePath, e);
 			}
 		}
 	}
@@ -1779,7 +1795,7 @@ public class BinaryStoreDriver implements StoreDriver {
 
 	@Override
 	public Result<Throwable> close() {
-		Result<Throwable> result = flush();
+		Result<Throwable> result = commit();
 		if(!result.isSuccess()) { return result; }
 		if(!isClosed) {
 			try {

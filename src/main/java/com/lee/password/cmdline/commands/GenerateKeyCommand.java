@@ -20,7 +20,7 @@ public class GenerateKeyCommand implements Command {
 	
 	@Override
 	public void execute() {
-		Triple<Boolean, String, CryptoDriver> result = current().getVariable(Name.CRYPTO_DRIVER, CryptoDriver.class);
+		Triple<Boolean, String, CryptoDriver> result = current().getCryptoDriver();
 		if(!result.first) {
 			line(result.second);
 		}else {

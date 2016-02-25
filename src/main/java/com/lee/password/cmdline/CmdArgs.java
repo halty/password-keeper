@@ -8,12 +8,26 @@ import java.util.List;
 import java.util.Map;
 
 import com.lee.password.cmdline.Environment.Name;
+import com.lee.password.cmdline.commands.AddPwdCommand;
 import com.lee.password.cmdline.commands.AddWebCommand;
+import com.lee.password.cmdline.commands.ChangePwdCommand;
+import com.lee.password.cmdline.commands.ChangeWebCommand;
+import com.lee.password.cmdline.commands.CommitCommand;
+import com.lee.password.cmdline.commands.CountPwdCommand;
+import com.lee.password.cmdline.commands.CountWebCommand;
+import com.lee.password.cmdline.commands.ExitCommand;
 import com.lee.password.cmdline.commands.GenerateKeyCommand;
 import com.lee.password.cmdline.commands.HelpCommand;
 import com.lee.password.cmdline.commands.ListEnvCommand;
+import com.lee.password.cmdline.commands.ListPwdCommand;
+import com.lee.password.cmdline.commands.ListWebCommand;
+import com.lee.password.cmdline.commands.QueryPwdCommand;
+import com.lee.password.cmdline.commands.QueryWebCommand;
+import com.lee.password.cmdline.commands.RedoCommand;
+import com.lee.password.cmdline.commands.RemovePwdCommand;
 import com.lee.password.cmdline.commands.RemoveWebCommand;
 import com.lee.password.cmdline.commands.SetCommand;
+import com.lee.password.cmdline.commands.UndoCommand;
 import com.lee.password.util.Converter;
 import com.lee.password.util.Triple;
 
@@ -32,13 +46,20 @@ public enum CmdArgs {
 			case 2:
 				secondaryName = cmdArgsList.get(1);
 			case 1:
-				primaryName = cmdArgsList.get(0);
-				Cmd cmd = Cmd.match(primaryName, secondaryName);
-				return cmd == null ? Cmd.incorrectCommand("no matched command for 'help' command")
-						: new HelpCommand(cmd);
-			case 0: return new HelpCommand();
+				String field = cmdArgsList.get(0);
+				if("-h".equals(field)) {
+					return new HelpCommand(Cmd.HELP);
+				}else if("-s".equals(field)) {
+					return new HelpCommand(true);
+				}else {
+					primaryName = field;
+					Cmd cmd = Cmd.match(primaryName, secondaryName);
+					return cmd == null ? Cmd.incorrectCommand("no matched command for '" + Cmd.HELP.cmd() + "' command")
+							: new HelpCommand(cmd);
+				}
+			case 0: return new HelpCommand(false);
 			default:
-				return Cmd.incorrectCommand("incorrect command arguments for 'help' command");
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.HELP.cmd() + "' command");
 			}
 		}
 	},
@@ -47,8 +68,16 @@ public enum CmdArgs {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
 			int size = cmdArgsList.size();
-			return size == 0 ? new ListEnvCommand()
-					: Cmd.incorrectCommand("incorrect command arguments for 'list env' command");
+			switch(size) {
+			case 0:
+				return new ListEnvCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.LIST_ENV);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.LIST_ENV.cmd() + "' command");
+			}
 		}
 	},
 	
@@ -59,6 +88,9 @@ public enum CmdArgs {
 			switch(size) {
 			case 0: return new SetCommand();
 			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.SET);
+				}
 				String args = cmdArgsList.get(0);
 				Name name = Environment.nameOf(args);
 				if(name == null) {
@@ -74,7 +106,7 @@ public enum CmdArgs {
 				}
 				return new SetCommand(variableName, value);
 			default:
-				return Cmd.incorrectCommand("incorrect command arguments for 'set' command");
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.SET.cmd() + "' command");
 			}
 		}
 	},
@@ -86,6 +118,8 @@ public enum CmdArgs {
 	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.GENERATE_KEY); }
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.GENERATE_KEY, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Integer> keyTriple = parseArgsValue(Cmd.GENERATE_KEY, triple.third, "-s", Integer.class);
@@ -103,6 +137,8 @@ public enum CmdArgs {
 	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.ADD_WEB); }
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.ADD_WEB, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, String> keywordTriple = parseArgsValue(Cmd.ADD_WEB, triple.third, "-k", String.class);
@@ -120,6 +156,8 @@ public enum CmdArgs {
 	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.REMOVE_WEB); }
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.REMOVE_WEB, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, String> keywordTriple = parseArgsValue(Cmd.REMOVE_WEB, triple.third, "-k", String.class);
@@ -127,107 +165,289 @@ public enum CmdArgs {
 			Triple<Boolean, String, Long> webisteIdTriple = parseArgsValue(Cmd.REMOVE_WEB, triple.third, "-i", Long.class);
 			Long websiteId = webisteIdTriple.third;
 			if(keyword == null && websiteId == null) {
-				return Cmd.incorrectCommand("while removing website, no keyword and websiteId are specified");
+				return Cmd.incorrectCommand("while remove website, keyword or websiteId don't specified, "
+						+ "please run 'help remove web' command to check the use examples");
 			}
 			return new RemoveWebCommand(websiteId, keyword);
 		}
 	},
-	CHANGE_WEB_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	CHANGE_WEB_ARGS(
+		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
+		triple("-u", false, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.CHANGE_WEB); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.CHANGE_WEB, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Map<String, Object> valueMap = triple.third;
+			int argsCount = 0;
+			Triple<Boolean, String, Long> webisteIdTriple = parseArgsValue(Cmd.CHANGE_WEB, valueMap, "-i", Long.class);
+			Long websiteId = webisteIdTriple.third;
+			if(websiteId != null) { argsCount++; }
+			Triple<Boolean, String, String> keywordTriple = parseArgsValue(Cmd.CHANGE_WEB, valueMap, "-k", String.class);
+			String keyword = keywordTriple.third;
+			if(keyword != null && !keyword.isEmpty()) { argsCount++; }
+			Triple<Boolean, String, String> urlTriple = parseArgsValue(Cmd.CHANGE_WEB, valueMap, "-u", String.class);
+			String url = urlTriple.third;
+			if(url != null && !url.isEmpty()) { argsCount++; }
+			if(argsCount <= 1) {
+				return Cmd.incorrectCommand("while change website, not enough arguments, please run 'help change web' command "
+						+ "to check the use examples");
+			}
+			return new ChangeWebCommand(websiteId, keyword, url);
 		}
 	},
-	QUERY_WEB_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	QUERY_WEB_ARGS(
+		triple("-k", false, STRING_CONVERTER),
+		triple("-i", false, LONG_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.QUERY_WEB); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.QUERY_WEB, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, String> keywordTriple = parseArgsValue(Cmd.QUERY_WEB, triple.third, "-k", String.class);
+			String keyword = keywordTriple.third;
+			Triple<Boolean, String, Long> webisteIdTriple = parseArgsValue(Cmd.QUERY_WEB, triple.third, "-i", Long.class);
+			Long websiteId = webisteIdTriple.third;
+			if(keyword == null && websiteId == null) {
+				return Cmd.incorrectCommand("while query website, keyword or websiteId don't specified, "
+						+ "please run 'help query web' command to check the use examples");
+			}
+			return new QueryWebCommand(websiteId, keyword);
 		}
 	},
+	
 	COUNT_WEB_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			switch(size) {
+			case 0:
+				return new CountWebCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.COUNT_WEB);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.COUNT_WEB.cmd() + "' command");
+			}
 		}
 	},
+	
 	LIST_WEB_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			switch(size) {
+			case 0:
+				return new ListWebCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.LIST_WEB);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.LIST_WEB.cmd() + "' command");
+			}
 		}
 	},
-	ADD_PWD_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	ADD_PWD_ARGS(
+		triple("-i", true, LONG_CONVERTER),
+		triple("-n", true, STRING_CONVERTER),
+		triple("-p", true, STRING_CONVERTER),
+		triple("-m", false, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.ADD_PWD); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.ADD_PWD, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-i", Long.class);
+			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-n", String.class);
+			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
+			Triple<Boolean, String, String> passwordTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-p", String.class);
+			if(!passwordTriple.first) { return Cmd.incorrectCommand(passwordTriple.second); }
+			Triple<Boolean, String, String> memoTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-m", String.class);
+			return new AddPwdCommand(websiteIdTriple.third, usernameTriple.third, passwordTriple.third, memoTriple.third);
 		}
 	},
-	REMOVE_PWD_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	REMOVE_PWD_ARGS(
+		triple("-i", true, LONG_CONVERTER),
+		triple("-n", true, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.REMOVE_PWD); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.REMOVE_PWD, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.REMOVE_PWD, triple.third, "-i", Long.class);
+			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.REMOVE_PWD, triple.third, "-n", String.class);
+			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
+			return new RemovePwdCommand(websiteIdTriple.third, usernameTriple.third);
 		}
 	},
-	CHANGE_PWD_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	CHANGE_PWD_ARGS(
+		triple("-i", true, LONG_CONVERTER),
+		triple("-n", true, STRING_CONVERTER),
+		triple("-p", false, STRING_CONVERTER),
+		triple("-m", false, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.CHANGE_PWD); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.CHANGE_PWD, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-i", Long.class);
+			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-n", String.class);
+			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
+			Triple<Boolean, String, String> passwordTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-p", String.class);
+			Triple<Boolean, String, String> memoTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-m", String.class);
+			if(!passwordTriple.first && !memoTriple.first) {
+				return Cmd.incorrectCommand("while change password, not enough arguments, please run 'help change pwd' command "
+						+ "to check the use examples");
+			}
+			return new ChangePwdCommand(websiteIdTriple.third, usernameTriple.third, passwordTriple.third, memoTriple.third);
 		}
 	},
-	QUERY_PWD_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	QUERY_PWD_ARGS(
+		triple("-i", true, LONG_CONVERTER),
+		triple("-n", true, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.QUERY_PWD); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.QUERY_PWD, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.QUERY_PWD, triple.third, "-i", Long.class);
+			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.QUERY_PWD, triple.third, "-n", String.class);
+			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
+			return new QueryPwdCommand(websiteIdTriple.third, usernameTriple.third);
 		}
 	},
-	COUNT_PWD_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	COUNT_PWD_ARGS(
+		triple("-i", false, LONG_CONVERTER),
+		triple("-n", false, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.COUNT_PWD); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.COUNT_PWD, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.COUNT_PWD, triple.third, "-i", Long.class);
+			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.COUNT_PWD, triple.third, "-n", String.class);
+			return new CountPwdCommand(websiteIdTriple.third, usernameTriple.third);
 		}
 	},
-	LIST_PWD_ARGS() {
+	
+	@SuppressWarnings("unchecked")
+	LIST_PWD_ARGS(
+		triple("-i", false, LONG_CONVERTER),
+		triple("-n", false, STRING_CONVERTER)
+	) {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			if(size == 1 && "-h".equals(cmdArgsList.get(0))) { return new HelpCommand(Cmd.LIST_PWD); }
+			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.LIST_PWD, cmdArgsList);
+			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
+			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.LIST_PWD, triple.third, "-i", Long.class);
+			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.LIST_PWD, triple.third, "-n", String.class);
+			if(!websiteIdTriple.first && !usernameTriple.first) {
+				return Cmd.incorrectCommand("while list password, not enough arguments, please run 'help list pwd' command "
+						+ "to check the use examples");
+			}
+			return new ListPwdCommand(websiteIdTriple.third, usernameTriple.third);
 		}
 	},
 	UNDO_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			switch(size) {
+			case 0:
+				return new UndoCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.UNDO);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.UNDO.cmd() + "' command");
+			}
 		}
 	},
 	REDO_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			switch(size) {
+			case 0:
+				return new RedoCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.REDO);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.REDO.cmd() + "' command");
+			}
 		}
 	},
 	COMMIT_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			switch(size) {
+			case 0:
+				return new CommitCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.COMMIT);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.COMMIT.cmd() + "' command");
+			}
 		}
 	},
 	EXIT_ARGS() {
 		@Override
 		public Command parse(List<String> cmdArgsList) {
-			// TODO Auto-generated method stub
-			return null;
+			int size = cmdArgsList.size();
+			switch(size) {
+			case 0:
+				return new ExitCommand();
+			case 1:
+				if("-h".equals(cmdArgsList.get(0))) {
+					return new HelpCommand(Cmd.EXIT);
+				}
+			default:
+				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.EXIT.cmd() + "' command");
+			}
 		}
 	},
 	;
@@ -249,7 +469,7 @@ public enum CmdArgs {
 			return Triple.create(true, "success", emptyValueMap);
 		}
 		if(size % 2 != 0) {
-			return Triple.create(false, "the number of '" + cmd.name() + "' command argument must be an even", null);
+			return Triple.create(false, "the number of '" + cmd.cmd() + "' command argument must be an even", null);
 		}
 		
 		Map<String, Object> valueMap = new HashMap<String, Object>(converterMap.size());
@@ -260,17 +480,17 @@ public enum CmdArgs {
 			Pair<Boolean, Converter<?>> pair = converterMap.get(option);
 			if(pair == null) {
 				return Triple.create(false, "unrecognized argument option '" + option
-					+ "' for '" + cmd.name() + "' command", null);
+					+ "' for '" + cmd.cmd() + "' command", null);
 			}
 			Object argsValue = pair.second.convert(value);
 			if(argsValue == null) {
 				return Triple.create(false, "illeagl argument value '" + value + "' mapped with option '" + option
-						+ "' for '" + cmd.name() + "' command", null);
+						+ "' for '" + cmd.cmd() + "' command", null);
 			}
 			Object oldArgsValue = valueMap.put(option, argsValue);
 			if(oldArgsValue != null) {
 				return Triple.create(false, "duplicate argument value '" + value + "' mapped with option '" + option
-						+ "' for '" + cmd.name() + "' command", null);
+						+ "' for '" + cmd.cmd() + "' command", null);
 			}
 		}
 		return Triple.create(true, "success", valueMap);
@@ -282,15 +502,15 @@ public enum CmdArgs {
 			Pair<Boolean, Converter<?>> pair = converterMap.get(argsOption);
 			if(pair.first) {
 				return Triple.create(false, "no mapping value of required '"+ argsOption + "' option for '"
-					+ cmd.name() + "' command", null);
+					+ cmd.cmd() + "' command", null);
 			}else {
 				return Triple.create(true, "'"+ argsOption + "' option is optional for '"
-						+ cmd.name() + "' command", null);
+						+ cmd.cmd() + "' command", null);
 			}
 		}
 		if(!clazz.isInstance(value)) {
 			return Triple.create(false, "illegal value format of '"+ argsOption + "' option for '"
-					+ cmd.name() + "' command: "+value, null);
+					+ cmd.cmd() + "' command: "+value, null);
 		}
 		return Triple.create(true, "success", clazz.cast(value));
 	}

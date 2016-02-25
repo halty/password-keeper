@@ -14,6 +14,11 @@ public class Password implements Entity {
 		this.header = new Header(websiteId, username);
 		this.secret = new Secret();
 	}
+	
+	public Password(long websiteId, String username, long timestamp) {
+		this.header = new Header(websiteId, username, timestamp);
+		this.secret = new Secret();
+	}
 
 	public Header header() { return header; }
 
@@ -34,7 +39,7 @@ public class Password implements Entity {
 	}
 	
 	public Password keyValuePairs(String kvp) {
-		secret.keyValuePairs = new StringBuilder(kvp.length()).append(decode(kvp));
+		secret.keyValuePairs = new StringBuilder(kvp.length()).append(encode(kvp));
 		return this;
 	}
 	
@@ -80,11 +85,15 @@ public class Password implements Entity {
 		}
 		
 		public Header(long websiteId, String username) {
+			this(websiteId, username, System.currentTimeMillis());
+		}
+		
+		public Header(long websiteId, String username, long timestamp) {
 			this.websiteId = websiteId;
 			this.hasId = true;
 			this.username = username;
 			this.hasUsername = isNotEmpty(username); 
-			this.timestamp = System.currentTimeMillis();
+			this.timestamp = timestamp;
 		}
 		
 		private static boolean isNotEmpty(String str) { return str != null && !str.isEmpty(); }
@@ -107,7 +116,7 @@ public class Password implements Entity {
 		
 		public String password() { return password; }
 		
-		public String keyValuePairs() { return keyValuePairs == null ? null : keyValuePairs.toString(); }
+		public String keyValuePairs() { return keyValuePairs == null ? null : decode(keyValuePairs.toString()); }
 	}
 
 	@Override

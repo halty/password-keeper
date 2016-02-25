@@ -431,6 +431,10 @@ public class BinaryStoreDriverFirstTest {
 		Assert.assertTrue(countResult.isSuccess());
 		Assert.assertTrue(countResult.result == 2);
 		
+		countResult = storeDriver.passwordCount(websiteId, username);
+		Assert.assertTrue(countResult.isSuccess());
+		Assert.assertTrue(countResult.result == 1);
+		
 		countResult = storeDriver.passwordCount(0);
 		Assert.assertTrue(countResult.isSuccess());
 		Assert.assertTrue(countResult.result == 0);
@@ -470,6 +474,13 @@ public class BinaryStoreDriverFirstTest {
 		headerList = listResult.result;
 		Assert.assertTrue(headerList != null && headerList.size() == 1);
 		header = headerList.get(0);
+		Assert.assertEquals(websiteId, header.websiteId());
+		Assert.assertEquals(username, header.username());
+		
+		Result<Header> listPwdResult = storeDriver.listPassword(websiteId, username);
+		Assert.assertTrue(listPwdResult.isSuccess());
+		header = listPwdResult.result;
+		Assert.assertTrue(header != null);
 		Assert.assertEquals(websiteId, header.websiteId());
 		Assert.assertEquals(username, header.username());
 		
@@ -551,7 +562,7 @@ public class BinaryStoreDriverFirstTest {
 	
 	@Test
 	public void testFlush() {
-		Result<Throwable> result = storeDriver.flush();
+		Result<Throwable> result = storeDriver.commit();
 		Assert.assertTrue(result.isSuccess());
 		Assert.assertNull(result.result);
 		

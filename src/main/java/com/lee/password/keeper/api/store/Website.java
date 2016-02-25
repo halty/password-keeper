@@ -43,20 +43,25 @@ public class Website implements Entity {
 
 	public String keyword() { return keyword; }
 	
-	public void keyword(String keyword) {
+	public Website keyword(String keyword) {
 		this.keyword = keyword;
 		this.hasKeyword = isNotEmpty(keyword);
+		return this;
 	}
 
 	public String url() { return url; }
 
-	public void url(String url) { this.url = url; }
+	public Website url(String url) {
+		this.url = url;
+		return this;
+	}
 	
 	public long id() { return id; }
 
-	public void id(long id) {
+	public Website id(long id) {
 		this.id = id;
 		this.hasId = true;
+		return this;
 	}
 	
 	/** if this method return {@code false}, then {@link #id()} behavior is undefined **/
