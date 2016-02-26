@@ -15,12 +15,14 @@ public class SetCommand implements Command {
 	private final boolean isSet;
 	private final Name name;
 	private final String value;
+	private final boolean isPersistent;
 	
 	/** show all the program environment variables **/
 	public SetCommand() {
 		this.isSet = false;
 		this.name = null;
 		this.value = null;
+		this.isPersistent = false;
 	}
 	
 	/** show the program environment variable value named with {@code name} **/
@@ -28,13 +30,19 @@ public class SetCommand implements Command {
 		this.isSet = false;
 		this.name = name;
 		this.value = null;
+		this.isPersistent = false;
 	}
 	
-	/** set the program environment variable with specified {@code name} and {@code value} **/
-	public SetCommand(Name name, String value) {
+	/**
+	 * set the program environment variable with specified {@code name} and {@code value},
+	 * and store persistently in an implementation-dependent backing store
+	 * if {@code isPersistent = true}
+	 */
+	public SetCommand(Name name, String value, boolean isPersistent) {
 		this.isSet = true;
 		this.name = name;
 		this.value = value;
+		this.isPersistent = isPersistent;
 	}
 	
 	@Override
@@ -43,6 +51,7 @@ public class SetCommand implements Command {
 		if(isSet) {
 			Pair<Boolean, String> result = env.putVariable(name, value);
 			if(result.first) {
+				if(isPersistent) { putPref(name, value); }
 				line("variable named with '" + name.name + "' was set successful");
 			}else {
 				line("variable named with '" + name.name + "' was set failed: "+result.second);

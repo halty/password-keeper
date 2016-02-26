@@ -11,6 +11,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.prefs.BackingStoreException;
+import java.util.prefs.Preferences;
 
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.crypto.CryptoDriver;
@@ -176,6 +178,22 @@ public final class Environment {
 	
 	public static Name nameOf(String name) { return NAME_MAP.get(name); }
 	
+	private static final Preferences PREFS = userPreferences();
+	
+	private static Preferences userPreferences() {
+		Preferences prefs = Preferences.userRoot().node("/com/lee/password-keeper");
+		try {
+			prefs.flush();
+			return prefs;
+		}catch(BackingStoreException e) {
+			throw new IllegalStateException("failed to init user preferences node: /com/lee/password-keeper", e);
+		}
+	}
+	
+	public static void putPref(Name name, String value) { PREFS.put(name.name, value); }
+	
+	public static String getPref(Name name) { return PREFS.get(name.name, null); }
+	
 	private static final Environment ENV = new Environment();
 	
 	public static Environment current() { return ENV; }
@@ -196,15 +214,45 @@ public final class Environment {
 		}
 	}
 	
+	private static enum State { ENTER, RUNNING, EXIT }
+	
 	private final Map<Name, Pair<String, Object>> variableMap = new HashMap<Name, Pair<String, Object>>();
 	private Holder<CryptoDriver> cryptoDriver;
 	private Holder<CryptoKey> encryptionKey;
 	private Holder<CryptoKey> decryptionKey;
 	private Holder<StoreDriver> storeDriver;
 	
-	private boolean exitSystem = false;
+	private State state;
 	
-	private Environment() {}
+	private Environment() {
+		signalEnter();
+		line("init password-keeper environment...");
+		for(Name name : Name.values()) {
+			String pref = getPref(name);
+			if(pref != null) {
+				Pair<Boolean, String> result = putVariable(name, pref);
+				if(result.first) {
+					indent("load preference variable '"+name.name+"' as '"+pref+"' successful");
+				}else {
+					indent("load preference variable '"+name.name+"' failed: "+result.second);
+				}
+			}
+		}
+		line("init password-keeper finished");
+	}
+	
+	public void signalEnter() {
+		if(state != null) { throw new IllegalStateException("current state is null, can not enter"); }
+		state = State.ENTER;
+	}
+	public void signalRunning() {
+		if(state != State.ENTER) { throw new IllegalStateException("can not shift to 'running' for illegal current state: "+state); }
+		state = State.RUNNING;
+	}
+	public void signalExit() {
+		if(state != State.RUNNING) { throw new IllegalStateException("can not shift to 'exit' for illegal current state: "+state); }
+		state = State.EXIT;
+	}
 	
 	/**
 	 * <pre>
@@ -434,6 +482,4 @@ public final class Environment {
 			}
 		}
 	}
-	
-	public void signalExit() { if(!exitSystem) { exitSystem = true; } }
 }

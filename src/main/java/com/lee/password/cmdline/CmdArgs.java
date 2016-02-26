@@ -91,20 +91,37 @@ public enum CmdArgs {
 				if("-h".equals(cmdArgsList.get(0))) {
 					return new HelpCommand(Cmd.SET);
 				}
-				String args = cmdArgsList.get(0);
-				Name name = Environment.nameOf(args);
+				String first = cmdArgsList.get(0);
+				Name name = Environment.nameOf(first);
 				if(name == null) {
-					return Cmd.incorrectCommand("no program environment variable named with '" + args + "'");
+					return Cmd.incorrectCommand("no program environment variable named with '" + first + "'");
 				}
 				return new SetCommand(name);
 			case 2:
-				String first = cmdArgsList.get(0);
-				String value = cmdArgsList.get(1);
+				first = cmdArgsList.get(0);
+				String second = cmdArgsList.get(1);
 				Name variableName = Environment.nameOf(first);
 				if(variableName == null) {
 					return Cmd.incorrectCommand("no program environment variable named with '" + first + "'");
 				}
-				return new SetCommand(variableName, value);
+				return new SetCommand(variableName, second, false);
+			case 3:
+				first = cmdArgsList.get(0);
+				second = cmdArgsList.get(1);
+				String third = cmdArgsList.get(2);
+				if("-p".equals(first)) {
+					variableName = Environment.nameOf(second);
+					if(variableName == null) {
+						return Cmd.incorrectCommand("no program environment variable named with '" + second + "'");
+					}
+					return new SetCommand(variableName, third, true);
+				}else if("-p".equals(third)) {
+					variableName = Environment.nameOf(first);
+					if(variableName == null) {
+						return Cmd.incorrectCommand("no program environment variable named with '" + first + "'");
+					}
+					return new SetCommand(variableName, second, true);
+				}
 			default:
 				return Cmd.incorrectCommand("incorrect command arguments for '" + Cmd.SET.cmd() + "' command");
 			}
@@ -274,13 +291,17 @@ public enum CmdArgs {
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.ADD_PWD, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-i", Long.class);
-			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> websiteKeywordTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-k", String.class);
+			if(!websiteIdTriple.first && !websiteKeywordTriple.first) {
+				return Cmd.incorrectCommand("while add password, websiteId or websiteKeyword don't specified, "
+						+ "please run 'help add pwd' command to check the use examples");
+			}
 			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-n", String.class);
 			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
 			Triple<Boolean, String, String> passwordTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-p", String.class);
 			if(!passwordTriple.first) { return Cmd.incorrectCommand(passwordTriple.second); }
 			Triple<Boolean, String, String> memoTriple = parseArgsValue(Cmd.ADD_PWD, triple.third, "-m", String.class);
-			return new AddPwdCommand(websiteIdTriple.third, usernameTriple.third, passwordTriple.third, memoTriple.third);
+			return new AddPwdCommand(websiteKeywordTriple.third, websiteIdTriple.third, usernameTriple.third, passwordTriple.third, memoTriple.third);
 		}
 	},
 	
@@ -296,10 +317,14 @@ public enum CmdArgs {
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.REMOVE_PWD, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.REMOVE_PWD, triple.third, "-i", Long.class);
-			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> websiteKeywordTriple = parseArgsValue(Cmd.REMOVE_PWD, triple.third, "-k", String.class);
+			if(!websiteIdTriple.first && !websiteKeywordTriple.first) {
+				return Cmd.incorrectCommand("while remove password, websiteId or websiteKeyword don't specified, "
+						+ "please run 'help remove pwd' command to check the use examples");
+			}
 			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.REMOVE_PWD, triple.third, "-n", String.class);
 			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
-			return new RemovePwdCommand(websiteIdTriple.third, usernameTriple.third);
+			return new RemovePwdCommand(websiteKeywordTriple.third, websiteIdTriple.third, usernameTriple.third);
 		}
 	},
 	
@@ -317,7 +342,11 @@ public enum CmdArgs {
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.CHANGE_PWD, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-i", Long.class);
-			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> websiteKeywordTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-k", String.class);
+			if(!websiteIdTriple.first && !websiteKeywordTriple.first) {
+				return Cmd.incorrectCommand("while change password, websiteId or websiteKeyword don't specified, "
+						+ "please run 'help change pwd' command to check the use examples");
+			}
 			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-n", String.class);
 			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
 			Triple<Boolean, String, String> passwordTriple = parseArgsValue(Cmd.CHANGE_PWD, triple.third, "-p", String.class);
@@ -326,7 +355,7 @@ public enum CmdArgs {
 				return Cmd.incorrectCommand("while change password, not enough arguments, please run 'help change pwd' command "
 						+ "to check the use examples");
 			}
-			return new ChangePwdCommand(websiteIdTriple.third, usernameTriple.third, passwordTriple.third, memoTriple.third);
+			return new ChangePwdCommand(websiteKeywordTriple.third, websiteIdTriple.third, usernameTriple.third, passwordTriple.third, memoTriple.third);
 		}
 	},
 	
@@ -342,10 +371,14 @@ public enum CmdArgs {
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.QUERY_PWD, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.QUERY_PWD, triple.third, "-i", Long.class);
-			if(!websiteIdTriple.first) { return Cmd.incorrectCommand(websiteIdTriple.second); }
+			Triple<Boolean, String, String> websiteKeywordTriple = parseArgsValue(Cmd.QUERY_PWD, triple.third, "-k", String.class);
+			if(!websiteIdTriple.first && !websiteKeywordTriple.first) {
+				return Cmd.incorrectCommand("while query password, websiteId or websiteKeyword don't specified, "
+						+ "please run 'help query pwd' command to check the use examples");
+			}
 			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.QUERY_PWD, triple.third, "-n", String.class);
 			if(!usernameTriple.first) { return Cmd.incorrectCommand(usernameTriple.second); }
-			return new QueryPwdCommand(websiteIdTriple.third, usernameTriple.third);
+			return new QueryPwdCommand(websiteKeywordTriple.third, websiteIdTriple.third, usernameTriple.third);
 		}
 	},
 	
@@ -361,8 +394,9 @@ public enum CmdArgs {
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.COUNT_PWD, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.COUNT_PWD, triple.third, "-i", Long.class);
+			Triple<Boolean, String, String> websiteKeywordTriple = parseArgsValue(Cmd.COUNT_PWD, triple.third, "-k", String.class);
 			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.COUNT_PWD, triple.third, "-n", String.class);
-			return new CountPwdCommand(websiteIdTriple.third, usernameTriple.third);
+			return new CountPwdCommand(websiteKeywordTriple.third, websiteIdTriple.third, usernameTriple.third);
 		}
 	},
 	
@@ -378,12 +412,13 @@ public enum CmdArgs {
 			Triple<Boolean, String, Map<String, Object>> triple = parseArgs(Cmd.LIST_PWD, cmdArgsList);
 			if(!triple.first) { return Cmd.incorrectCommand(triple.second); }
 			Triple<Boolean, String, Long> websiteIdTriple = parseArgsValue(Cmd.LIST_PWD, triple.third, "-i", Long.class);
+			Triple<Boolean, String, String> websiteKeywordTriple = parseArgsValue(Cmd.LIST_PWD, triple.third, "-k", String.class);
 			Triple<Boolean, String, String> usernameTriple = parseArgsValue(Cmd.LIST_PWD, triple.third, "-n", String.class);
-			if(!websiteIdTriple.first && !usernameTriple.first) {
+			if(!websiteIdTriple.first && !websiteKeywordTriple.first && !usernameTriple.first) {
 				return Cmd.incorrectCommand("while list password, not enough arguments, please run 'help list pwd' command "
 						+ "to check the use examples");
 			}
-			return new ListPwdCommand(websiteIdTriple.third, usernameTriple.third);
+			return new ListPwdCommand(websiteKeywordTriple.third, websiteIdTriple.third, usernameTriple.third);
 		}
 	},
 	UNDO_ARGS() {

@@ -1,18 +1,15 @@
 package com.lee.password.cmdline.commands;
 
 import static com.lee.password.cmdline.Environment.current;
-import static com.lee.password.cmdline.Environment.format;
 import static com.lee.password.cmdline.Environment.line;
-import static com.lee.password.cmdline.Environment.indent;
 import static com.lee.password.cmdline.Environment.prompt;
 
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.util.Triple;
 
-public class QueryWebCommand implements Command {
+public class QueryWebCommand extends BaseWebCommand {
 
 	private final Long websiteId;
 	private final String keyword;
@@ -37,10 +34,7 @@ public class QueryWebCommand implements Command {
 			}else {
 				Website web = queryResult.result;
 				line("query website successful:");
-				indent("websiteId -- " + web.id());
-				indent("keyword -- " + web.keyword());
-				indent("url -- " + web.url());
-				indent("lastChangedTime -- " + format(web.timestamp()));
+				printWebsite(web);
 			}
 		}
 		prompt();

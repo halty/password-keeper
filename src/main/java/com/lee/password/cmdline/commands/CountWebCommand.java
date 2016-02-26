@@ -5,12 +5,11 @@ import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
 import com.lee.password.cmdline.Cmd;
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.util.Triple;
 
-public class CountWebCommand implements Command {
+public class CountWebCommand extends BaseWebCommand {
 
 	@Override
 	public void execute() {

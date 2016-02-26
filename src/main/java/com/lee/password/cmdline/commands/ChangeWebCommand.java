@@ -4,13 +4,12 @@ import static com.lee.password.cmdline.Environment.current;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.util.Triple;
 
-public class ChangeWebCommand implements Command {
+public class ChangeWebCommand extends BaseWebCommand {
 
 	private final Long websiteId;
 	private final String keyword;
@@ -34,9 +33,9 @@ public class ChangeWebCommand implements Command {
 			website.url(url);
 			Result<Website> updatedResult = storeDriver.updateWebsite(website);
 			if(!updatedResult.isSuccess()) {
-				line("failed to update website: "+updatedResult.msg);
+				line("failed to change website: "+updatedResult.msg);
 			}else {
-				line("update website successful");
+				line("change website successful");
 			}
 		}
 		prompt();

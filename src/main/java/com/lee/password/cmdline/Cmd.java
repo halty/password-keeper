@@ -17,7 +17,7 @@ public enum Cmd {
 	HELP("help", CmdArgs.HELP_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("help [-h] [-s] [cmd]");
+			line("help -h | -s | cmd");
 		}
 		@Override
 		public void printDoc() {
@@ -48,7 +48,7 @@ public enum Cmd {
 	SET("set", CmdArgs.SET_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("set [-h] [key value]");
+			line("set -h | (key [value [-p]])");
 		}
 		@Override
 		public void printDoc() {
@@ -58,13 +58,16 @@ public enum Cmd {
 			indent("set -h -- show the help info of 'set' command");
 			indent("set keyDir -- show the program environment variable value named with 'keyDir'");
 			indent("set keyDir /User/key -- set the program environment variable 'keyDir' of value '/User/key'");
+			indent("set keyDir /User/key -p -- set the program environment variable 'keyDir' of value '/User/key', "
+					+ "and store persistently in an implementation-dependent backing store. "
+					+ "Each user has a separate user store");
 		}
 	},
 	
 	GENERATE_KEY("generate key", CmdArgs.GENERATE_KEY_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("generate key [-h] -s keySize -p targetKeyDir");
+			line("generate key -h | (-s keySize -p targetKeyDir)");
 		}
 		@Override
 		public void printDoc() {
@@ -82,7 +85,7 @@ public enum Cmd {
 	ADD_WEB("add web", CmdArgs.ADD_WEB_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("add web [-h] -k keyword -u url");
+			line("add web -h | (-k keyword -u url)");
 		}
 		@Override
 		public void printDoc() {
@@ -100,7 +103,7 @@ public enum Cmd {
 	REMOVE_WEB("remove web", CmdArgs.REMOVE_WEB_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("remove web [-h] [-k keyword] [-i websiteId]");
+			line("remove web -h | (-k keyword) | (-i websiteId)");
 		}
 		@Override
 		public void printDoc() {
@@ -120,7 +123,7 @@ public enum Cmd {
 	CHANGE_WEB("change web", CmdArgs.CHANGE_WEB_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("change web [-h] [-i websiteId] [-k keyword] [-u url]");
+			line("change web -h | (-k keyword -u url) | (-i websiteId [-k keyword] [-u url])");
 		}
 		@Override
 		public void printDoc() {
@@ -132,6 +135,7 @@ public enum Cmd {
 			indent("default '" + Name.STORE_DRIVER.name + "' implementation is '" + BinaryStoreDriver.class.getName() + "'");
 			line("Use examples:");
 			indent("change web -h -- show the help info of 'change web' command");
+			indent("change web -i 13457927563219 -k 'amazon' -- change a website keyword to 'amazon' by websiteId '13457927563219'");
 			indent("change web -i 13457927563219 -u 'www.amazon.cn' -- change a website url to 'www.amazon.cn' by websiteId '13457927563219'");
 			indent("change web -i 13457927563219 -k az -u 'www.amazon.cn' -- change a website keyword to 'az' "
 					+ "and url to 'www.amazon.cn' by websiteId '13457927563219'");
@@ -142,7 +146,7 @@ public enum Cmd {
 	QUERY_WEB("query web", CmdArgs.QUERY_WEB_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("query web [-h] [-i websiteId] [-k keyword]");
+			line("query web -h | (-i websiteId) | (-k keyword)");
 		}
 		@Override
 		public void printDoc() {
@@ -198,7 +202,7 @@ public enum Cmd {
 	ADD_PWD("add pwd", CmdArgs.ADD_PWD_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("add pwd [-h] -i websiteId -n username -p password [-m memo]");
+			line("add pwd -h | (((-i websiteId) | (-k websiteKeyword)) -n username -p password [-m memo])");
 		}
 		@Override
 		public void printDoc() {
@@ -212,13 +216,14 @@ public enum Cmd {
 			indent("add pwd -i 13457927563219 -n 'peter' -p 123456 -- add username 'peter' and password '123456' to website which id is '13457927563219'");
 			indent("add pwd -i 13457927563219 -n 'julia' -p 234567 -m 'payCode=love' -- add username 'julia' and password '234567' "
 					+ "with memo 'payCode=love' to website which id is '13457927563219'");
+			indent("add pwd -k 'amazon' -n 'peter' -p 123456 -- add username 'peter' and password '123456' to website which keyword is 'amazon'");
 		}
 	},
 	
 	REMOVE_PWD("remove pwd", CmdArgs.REMOVE_PWD_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("remove pwd [-h] -i websiteId -n username");
+			line("remove pwd -h | (((-i websiteId) | (-k websiteKeyword)) -n username)");
 		}
 		@Override
 		public void printDoc() {
@@ -230,13 +235,14 @@ public enum Cmd {
 			line("Use examples:");
 			indent("remove pwd -h -- show the help info of 'remove pwd' command");
 			indent("remove pwd -i 13457927563219 -n 'peter' -- remove password by username 'peter' from website which id is '13457927563219'");
+			indent("remove pwd -k 'amazon' -n 'peter' -- remove password by username 'peter' from website which keyword is 'amazon'");
 		}
 	},
 	
 	CHANGE_PWD("change pwd", CmdArgs.CHANGE_PWD_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("change pwd [-h] -i websiteId -n username [-p password] [-m memo]");
+			line("change pwd -h | (((-i websiteId) | (-k websiteKeyword)) -n username [-p password] [-m memo])");
 		}
 		@Override
 		public void printDoc() {
@@ -252,13 +258,14 @@ public enum Cmd {
 					+ "from website which id is '13457927563219'");
 			indent("change pwd -i 13457927563219 -n 'julia' -p 876543 -m 'payCode=hate' -- change password to '987654' and memo to 'payCode=hate' by username 'julia' "
 					+ "from website which id is '13457927563219'");
+			indent("change pwd -k 'amazon' -n 'peter' -p 987654 -- change password to '987654' by username 'peter' from website which keyword is 'amazon'");
 		}
 	},
 	
 	QUERY_PWD("query pwd", CmdArgs.QUERY_PWD_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("query pwd [-h] -i websiteId -n username");
+			line("query pwd -h | (((-i websiteId) | (-k websiteKeyword)) -n username)");
 		}
 		@Override
 		public void printDoc() {
@@ -270,13 +277,14 @@ public enum Cmd {
 			line("Use examples:");
 			indent("query pwd -h -- show the help info of 'query pwd' command");
 			indent("query pwd -i 13457927563219 -n 'peter' -- query password by username 'peter' from website which id is '13457927563219'");
+			indent("query pwd -k 'amazon' -n 'peter' -- query password by username 'peter' from website which keyword is 'amazon'");
 		}
 	},
 	
 	COUNT_PWD("count pwd", CmdArgs.COUNT_PWD_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("count pwd [-h] [-i websiteId] [-n username]");
+			line("count pwd -h | ([(-i websiteId) | (-k websiteKeyword)] [-n username])");
 		}
 		@Override
 		public void printDoc() {
@@ -292,13 +300,15 @@ public enum Cmd {
 			indent("count pwd -n 'peter' -- count the number of password by username 'peter'");
 			indent("count pwd -i 13457927563219 -n 'peter' -- count the number of password by username 'peter' "
 					+ "from website which id is '13457927563219'");
+			indent("count pwd -k 'amazon' -n 'peter' -- count the number of password by username 'peter' "
+					+ "from website which keyword is 'amazon'");
 		}
 	},
 	
 	LIST_PWD("list pwd", CmdArgs.LIST_PWD_ARGS) {
 		@Override
 		public void printSynopsis() {
-			line("list pwd [-h] [-i websiteId] [-n username]");
+			line("list pwd -h | (((-i websiteId) | (-k websiteKeyword)) [-n username]) | (-n username)");
 		}
 		@Override
 		public void printDoc() {
@@ -312,6 +322,7 @@ public enum Cmd {
 			indent("list pwd -i 13457927563219 -- list passwords from website which id is '13457927563219'");
 			indent("list pwd -n 'peter' -- list passwords by username 'peter'");
 			indent("list pwd -i 13457927563219 -n 'peter' -- list passwords by username 'peter' from website which id is '13457927563219'");
+			indent("list pwd -k 'amazon' -n 'peter' -- list passwords by username 'peter' from website which keyword is 'amazon'");
 		}
 	},
 	

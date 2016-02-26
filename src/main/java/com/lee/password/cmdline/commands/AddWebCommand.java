@@ -5,13 +5,12 @@ import static com.lee.password.cmdline.Environment.indent;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.util.Triple;
 
-public class AddWebCommand implements Command {
+public class AddWebCommand extends BaseWebCommand {
 
 	private final String keyword;
 	private final String url;

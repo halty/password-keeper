@@ -4,13 +4,12 @@ import static com.lee.password.cmdline.Environment.current;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.util.Triple;
 
-public class RemoveWebCommand implements Command {
+public class RemoveWebCommand extends BaseWebCommand {
 
 	private final Long websiteId;
 	private final String keyword;

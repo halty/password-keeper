@@ -15,19 +15,22 @@ public class CmdMain {
 	private static final Charset CHARSET = Charset.forName("utf-8");
 
 	private final BufferedReader stdin;
+	private final Environment env;
 	
-	public CmdMain() { stdin = new BufferedReader(new InputStreamReader(System.in, CHARSET)); }
+	private CmdMain() {
+		stdin = new BufferedReader(new InputStreamReader(System.in, CHARSET));
+		env = Environment.current();
+	}
 	
 	public static void main(String[] args) {
-		CmdMain main = new CmdMain();
-		int status = main.run();
-		System.exit(status);
+		System.exit(new CmdMain().run());
 	}
 	
 	private int run() {
 		try {
 			line(String.format("Good %s %s, welcome to passwod-keeper ^_^", timePeriod(), user()));
 			prompt();
+			env.signalRunning();
 			
 			String line = null;
 			while((line = stdin.readLine()) != null) {
@@ -38,6 +41,7 @@ public class CmdMain {
 			printStackTrace(e);
 			line("exit for unexpected exception: "+e.getMessage());
 		}
+		env.signalExit();
 		return SUCCESS_EXIT;
 	}
 	

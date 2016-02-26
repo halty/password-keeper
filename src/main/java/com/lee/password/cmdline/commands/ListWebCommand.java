@@ -1,21 +1,18 @@
 package com.lee.password.cmdline.commands;
 
 import static com.lee.password.cmdline.Environment.current;
-import static com.lee.password.cmdline.Environment.format;
-import static com.lee.password.cmdline.Environment.indent;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.newLine;
 import static com.lee.password.cmdline.Environment.prompt;
 
 import java.util.List;
 
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Website;
 import com.lee.password.util.Triple;
 
-public class ListWebCommand implements Command {
+public class ListWebCommand extends BaseWebCommand {
 
 	@Override
 	public void execute() {
@@ -42,12 +39,5 @@ public class ListWebCommand implements Command {
 			}
 		}
 		prompt();
-	}
-	
-	private void printWebsite(Website website) {
-		indent("websiteId -- " + website.id());
-		indent("keyword -- " + website.keyword());
-		indent("url -- " + website.url());
-		indent("lastChangedTime -- " + format(website.timestamp()));
 	}
 }

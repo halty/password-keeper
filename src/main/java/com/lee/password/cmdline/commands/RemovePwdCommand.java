@@ -4,20 +4,18 @@ import static com.lee.password.cmdline.Environment.current;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.prompt;
 
-import com.lee.password.cmdline.Command;
 import com.lee.password.keeper.api.Result;
 import com.lee.password.keeper.api.store.Password;
 import com.lee.password.keeper.api.store.StoreDriver;
 import com.lee.password.keeper.api.store.Password.Header;
 import com.lee.password.util.Triple;
 
-public class RemovePwdCommand implements Command {
+public class RemovePwdCommand extends BasePwdCommand {
 
-	private final Long websiteId;
 	private final String username;
 	
-	public RemovePwdCommand(Long websiteId, String username) {
-		this.websiteId = websiteId;
+	public RemovePwdCommand(String websiteKeyword, Long websiteId, String username) {
+		super(websiteKeyword, websiteId);
 		this.username = username;
 	}
 	
@@ -28,13 +26,18 @@ public class RemovePwdCommand implements Command {
 			line(storeDriverResult.second);
 		}else {
 			StoreDriver storeDriver = storeDriverResult.third;
-			Header pwdHeader = new Password.Header(websiteId, username);
-			
-			Result<Header> deletedResult = storeDriver.deletePassword(pwdHeader);
-			if(!deletedResult.isSuccess()) {
-				line("failed to delete password: "+deletedResult.msg);
+			Triple<Boolean, String, Long> triple = takeWebsiteId(storeDriver);
+			if(!triple.first) {
+				line("while remove password, "+triple.second);
 			}else {
-				line("delete password successful");
+				long websiteId = triple.third;
+				Header pwdHeader = new Password.Header(websiteId, username);
+				Result<Header> deletedResult = storeDriver.deletePassword(pwdHeader);
+				if(!deletedResult.isSuccess()) {
+					line("failed to remove password: "+deletedResult.msg);
+				}else {
+					line("remove password successful");
+				}
 			}
 		}
 		prompt();
