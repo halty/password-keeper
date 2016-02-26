@@ -1,6 +1,7 @@
 package com.lee.password.cmdline;
 
 import static com.lee.password.cmdline.Environment.line;
+import static com.lee.password.cmdline.Environment.newLine;
 import static com.lee.password.cmdline.Environment.printStackTrace;
 import static com.lee.password.cmdline.Environment.prompt;
 
@@ -37,6 +38,7 @@ public class CmdMain {
 				command.execute();
 			}
 			line("exit system successful!");
+			newLine();
 		}catch(Exception e) {
 			printStackTrace(e);
 			line("exit for unexpected exception: "+e.getMessage());
