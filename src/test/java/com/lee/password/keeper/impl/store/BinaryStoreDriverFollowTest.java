@@ -18,6 +18,8 @@ import com.lee.password.keeper.impl.crypto.RSACryptoDriver;
 
 public class BinaryStoreDriverFollowTest {
 	
+	private static final String TEST_DIR = "/password-keeper/tmp";
+	
 	private String keyword1 = "亚马逊";
 	private String url1 = "www.amazon.com";
 	private String username11 = "mobile";
@@ -41,12 +43,12 @@ public class BinaryStoreDriverFollowTest {
 	@Before
 	public void initStore() {
 		keySize = 1024;
-		keyDir = new File("E:/tmp/password-keeper/follow");
+		keyDir = new File(TEST_DIR, "follow");
 		cryptoDriver = new RSACryptoDriver();
 		Result<CryptoKey[]> keyPair = cryptoDriver.generateKeyPair(keyDir.getAbsolutePath(), keySize);
 		publicKey = keyPair.result[0];
 		privateKey = keyPair.result[1];
-		dataDir = new File("E:/tmp/password-keeper/follow");
+		dataDir = new File(TEST_DIR, "follow");
 		storeDriver = new BinaryStoreDriver(dataDir.getAbsolutePath(), cryptoDriver, privateKey.maxBlockSize(), false);
 		
 		Website website1 = new Website(keyword1, url1);
@@ -85,7 +87,7 @@ public class BinaryStoreDriverFollowTest {
 	
 	@Test
 	public void testFollow() {
-		keyDir = new File("E:/tmp/password-keeper/follow");
+		keyDir = new File(TEST_DIR, "follow");
 		cryptoDriver = new RSACryptoDriver();
 		Result<CryptoKey> loadKeyResult = cryptoDriver.loadPublicKey(keyDir.getAbsolutePath());
 		Assert.assertTrue(loadKeyResult.isSuccess());
@@ -93,7 +95,7 @@ public class BinaryStoreDriverFollowTest {
 		loadKeyResult = cryptoDriver.loadPrivateKey(keyDir.getAbsolutePath());
 		Assert.assertTrue(loadKeyResult.isSuccess());
 		privateKey = loadKeyResult.result;
-		dataDir = new File("E:/tmp/password-keeper/follow");
+		dataDir = new File(TEST_DIR, "follow");
 		storeDriver = new BinaryStoreDriver(dataDir.getAbsolutePath(), cryptoDriver, privateKey.maxBlockSize(), false);
 		
 		Result<Integer> websiteCountResult = storeDriver.websiteCount();

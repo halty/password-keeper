@@ -5,11 +5,16 @@
 	<artifactId>password-keeper</artifactId>
 	<version>1.0.0</version>
 	<name>password keeper</name>
+	
+	<properties>
+		<project.build.sourceEncoding>utf-8</project.build.sourceEncoding>
+	</properties>
 	<dependencies>
 		<dependency>
 			<groupId>junit</groupId>
 			<artifactId>junit</artifactId>
 			<version>4.10</version>
+			<scope>test</scope>
 		</dependency>
 	</dependencies>
 	<build>
@@ -34,6 +39,7 @@
 			<plugin>
 				<groupId>org.apache.maven.plugins</groupId>
 				<artifactId>maven-javadoc-plugin</artifactId>
+				<version>2.10.3</version>
 				<executions>
 					<execution>
 						<id>attach-javadocs</id>
@@ -42,6 +48,19 @@
 						</goals>
 					</execution>
 				</executions>
+			</plugin>
+			<plugin>
+        		<groupId>org.apache.maven.plugins</groupId>
+        		<artifactId>maven-jar-plugin</artifactId>
+        		<version>2.3.2</version>
+        		<configuration>
+        			<archive>
+            			<manifest>
+            				<mainClass>com.lee.password.cmdline.CmdMain</mainClass>
+              				<addClasspath>true</addClasspath>
+            			</manifest>
+          			</archive>
+        		</configuration>
 			</plugin>
 			<plugin>
         		<groupId>org.apache.maven.plugins</groupId>

@@ -3,7 +3,9 @@ package com.lee.password.keeper.impl.crypto;
 import java.io.File;
 import java.security.KeyPair;
 
+import org.junit.AfterClass;
 import org.junit.Assert;
+import org.junit.BeforeClass;
 import org.junit.Test;
 
 import com.lee.password.keeper.api.crypto.CryptoKey;
@@ -14,26 +16,35 @@ import com.lee.password.keeper.impl.crypto.rsa.RSAKeyWriter;
 
 public class RSACryptoTest {
 	
-	@Test
-	public void testKeyWriter() {
+	private static final String TEST_DIR = "/password-keeper/tmp";
+	
+	private static String publicKeyPath;
+	private static String privateKeyPath;
+	
+	@BeforeClass
+	public static void initKey() {
 		int keySize = 1024;
 		KeyPair keyPair = RSAKeyGenerator.generateKeyPair(keySize);
-		String destDir = "E:/tmp/password-keeper";
-		File parent = RSAKeyWriter.initKeyDir(destDir);
+		File destDir = new File(TEST_DIR);
+		File parent = RSAKeyWriter.initKeyDir(destDir.getAbsolutePath());
 		Assert.assertTrue(parent != null && parent.isDirectory());
 		int maxDataBlockSize = RSACryptor.maxDataBlockSize(keySize);
-		String publicKeyPath = RSAKeyWriter.serializePublicKey(keyPair.getPublic(), maxDataBlockSize, parent);
+		publicKeyPath = RSAKeyWriter.serializePublicKey(keyPair.getPublic(), maxDataBlockSize, parent);
 		Assert.assertNotNull(publicKeyPath);
 		int maxSecretBlockSize = RSACryptor.maxSecretBlockSize(keySize);
-		String privateKeyPath = RSAKeyWriter.serializePrivateKey(keyPair.getPrivate(), maxSecretBlockSize, parent);
+		privateKeyPath = RSAKeyWriter.serializePrivateKey(keyPair.getPrivate(), maxSecretBlockSize, parent);
 		Assert.assertNotNull(privateKeyPath);
-		new File(publicKeyPath).deleteOnExit();
-		new File(privateKeyPath).deleteOnExit();
+	}
+	
+	@AfterClass
+	public static void destroy() {
+		if(publicKeyPath != null) { new File(publicKeyPath).deleteOnExit(); }
+		if(privateKeyPath != null) { new File(privateKeyPath).deleteOnExit(); }
 	}
 	
 	@Test
 	public void testKeyReader() {
-		File destDir = new File("E:/tmp/password-keeper");
+		File destDir = new File(TEST_DIR);
 		File publicKeyFile = RSAKeyReader.detectPublicKey(destDir);
 		CryptoKey publicKey = RSAKeyReader.deserializePublicKey(publicKeyFile);
 		Assert.assertNotNull(publicKey);
@@ -44,7 +55,7 @@ public class RSACryptoTest {
 	
 	@Test
 	public void testCryptor() {
-		File destDir = new File("E:/tmp/password-keeper");
+		File destDir = new File(TEST_DIR);
 		File publicKeyFile = RSAKeyReader.detectPublicKey(destDir);
 		CryptoKey publicKey = RSAKeyReader.deserializePublicKey(publicKeyFile);
 		Assert.assertNotNull(publicKey);

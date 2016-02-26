@@ -22,6 +22,8 @@ import com.lee.password.keeper.impl.crypto.RSACryptoDriver;
 
 public class BinaryStoreDriverFirstTest {
 
+	private static final String TEST_DIR = "/password-keeper/tmp";
+	
 	private static int keySize;
 	private static File keyDir;
 	private static CryptoDriver cryptoDriver;
@@ -33,12 +35,12 @@ public class BinaryStoreDriverFirstTest {
 	@BeforeClass
 	public static void init() {
 		keySize = 1024;
-		keyDir = new File("E:/tmp/password-keeper/first");
+		keyDir = new File(TEST_DIR, "first");
 		cryptoDriver = new RSACryptoDriver();
 		Result<CryptoKey[]> keyPair = cryptoDriver.generateKeyPair(keyDir.getAbsolutePath(), keySize);
 		publicKey = keyPair.result[0];
 		privateKey = keyPair.result[1];
-		dataDir = new File("E:/tmp/password-keeper/first");
+		dataDir = new File(TEST_DIR, "first");
 		storeDriver = new BinaryStoreDriver(dataDir.getAbsolutePath(), cryptoDriver, privateKey.maxBlockSize(), false);
 	}
 	

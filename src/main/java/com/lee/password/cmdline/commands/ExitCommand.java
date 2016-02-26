@@ -14,22 +14,28 @@ public class ExitCommand implements Command {
 
 	@Override
 	public void execute() {
-		Triple<Boolean, String, StoreDriver> result = current().getStoreDriver();
-		if(!result.first) {
-			line(result.second);
+		if(current().canExitNow()) {
+			current().exitNow();
+			line("exiting system...");
 		}else {
-			StoreDriver storeDriver = result.third;
-			Result<Throwable> closeResult = storeDriver.close();
-			if(!closeResult.isSuccess()) {
-				line("failed to release system resources: "+closeResult.msg);
-				Throwable t = closeResult.result;
-				if(t != null) { printStackTrace(t); }
+			Triple<Boolean, String, StoreDriver> result = current().getStoreDriver();
+			if(!result.first) {
+				line(result.second);
+				prompt();
 			}else {
-				line("success to release system resources, exiting system...");
-				current().signalExit();
+				StoreDriver storeDriver = result.third;
+				Result<Throwable> closeResult = storeDriver.close();
+				if(!closeResult.isSuccess()) {
+					line("failed to release system resources: "+closeResult.msg);
+					Throwable t = closeResult.result;
+					if(t != null) { printStackTrace(t); }
+					prompt();
+				}else {
+					line("success to release system resources, exiting system...");
+					current().signalExit();
+				}
 			}
 		}
-		prompt();
 	}
 
 }

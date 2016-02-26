@@ -69,7 +69,7 @@ public interface StoreDriver {
 	
 	/**
 	 * undo the last change operation, return the undo target entry if success.
-	 * subsequent undo call will be failed after you call {@link #flush()}. 
+	 * subsequent undo call will be failed after you call {@link #commit()}. 
 	 */
 	Result<Entity> undo();
 	

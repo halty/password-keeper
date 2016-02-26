@@ -93,9 +93,9 @@ public class Base64Variants {
      * Translates the specified "alternate representation" Base64 byte array
      * into a string with charset.
      * 
-     * @throw IllegalArgumentException or ArrayOutOfBoundsException
-     *        if <tt>encoded</tt> is not a valid alternate representation
-     *        Base64 byte.
+     * @throws IllegalArgumentException or ArrayOutOfBoundsException
+     *          if <tt>encoded</tt> is not a valid alternate representation
+     *          Base64 byte.
      */
 	public static String decode(byte[] encoded, Charset charset) {
 		int len = encoded.length;
