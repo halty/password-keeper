@@ -18,8 +18,7 @@ you can see all the usage info with follow program command:
 `help`
 
 the details of all the usage info as follow:
-<code>
-
+`
 help -h | -s | cmd
 Use examples:
   help -- show all the command documents
@@ -211,4 +210,4 @@ Use examples:
   exit -- releases any associated system resources and exit
   exit -h -- show the help info of 'exit' command
 
-</code>
+`
