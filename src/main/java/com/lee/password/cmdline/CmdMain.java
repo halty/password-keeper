@@ -10,8 +10,7 @@ import java.nio.charset.Charset;
 import java.util.Calendar;
 
 public class CmdMain {
-	
-	private static final int SUCCESS_EXIT = 0;
+
 	private static final Charset CHARSET = Charset.forName("utf-8");
 
 	private final BufferedReader stdin;
@@ -23,10 +22,10 @@ public class CmdMain {
 	}
 	
 	public static void main(String[] args) {
-		System.exit(new CmdMain().run());
+		new CmdMain().run();
 	}
 	
-	private int run() {
+	private void run() {
 		try {
 			line(String.format("Good %s %s, welcome to passwod-keeper ^_^", timePeriod(), user()));
 			prompt();
@@ -42,7 +41,6 @@ public class CmdMain {
 			line("exit for unexpected exception: "+e.getMessage());
 		}
 		env.signalExit();
-		return SUCCESS_EXIT;
 	}
 	
 	private static String timePeriod() {

@@ -250,7 +250,8 @@ public final class Environment {
 		state = State.RUNNING;
 	}
 	public void signalExit() {
-		if(state != State.EXIT && state != State.RUNNING) { throw new IllegalStateException("can not shift to 'exit' for illegal current state: "+state); }
+		if(state == State.EXIT) { return; }
+		if(state != State.RUNNING) { throw new IllegalStateException("can not shift to 'exit' for illegal current state: "+state); }
 		state = State.EXIT;
 	}
 	

@@ -1,5 +1,5 @@
 # password-keeper
-a personal password keeper utility written by pure java supports most OS like Windows, Linux, OS X etc.
+a personal password keeper utility written by pure java supports most OS, like Windows, Linux, OS X etc.
 
 ## build
 use maven to build the project with follow command:
