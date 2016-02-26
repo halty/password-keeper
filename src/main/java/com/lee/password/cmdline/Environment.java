@@ -259,6 +259,8 @@ public final class Environment {
 	
 	public void exitNow() { signalExit(); }
 	
+	public boolean needExitSystem() { return state == State.EXIT; }
+	
 	/**
 	 * <pre>
 	 * The return result pair:

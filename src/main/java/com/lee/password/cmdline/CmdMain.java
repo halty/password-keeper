@@ -32,7 +32,7 @@ public class CmdMain {
 			env.signalRunning();
 			
 			String line = null;
-			while((line = stdin.readLine()) != null) {
+			while(!env.needExitSystem() && (line = stdin.readLine()) != null) {
 				Command command = Cmd.parse(line);
 				command.execute();
 			}
@@ -40,7 +40,6 @@ public class CmdMain {
 			printStackTrace(e);
 			line("exit for unexpected exception: "+e.getMessage());
 		}
-		env.signalExit();
 	}
 	
 	private static String timePeriod() {
