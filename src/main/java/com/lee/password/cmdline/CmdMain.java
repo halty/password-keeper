@@ -36,6 +36,7 @@ public class CmdMain {
 				Command command = Cmd.parse(line);
 				command.execute();
 			}
+			line("exit system successful!");
 		}catch(Exception e) {
 			printStackTrace(e);
 			line("exit for unexpected exception: "+e.getMessage());
