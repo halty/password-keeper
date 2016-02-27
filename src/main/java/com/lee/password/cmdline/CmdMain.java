@@ -1,5 +1,6 @@
 package com.lee.password.cmdline;
 
+import static com.lee.password.cmdline.Environment.indent;
 import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.newLine;
 import static com.lee.password.cmdline.Environment.printStackTrace;
@@ -9,6 +10,11 @@ import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.Charset;
 import java.util.Calendar;
+
+import com.lee.password.cmdline.Environment.Name;
+import com.lee.password.keeper.impl.crypto.RSACryptoDriver;
+import com.lee.password.keeper.impl.store.BinaryStoreDriver;
+import com.lee.password.util.Pair;
 
 public class CmdMain {
 
@@ -23,11 +29,35 @@ public class CmdMain {
 	}
 	
 	public static void main(String[] args) {
-		new CmdMain().run();
+		new CmdMain().useDefault().loadUserPrefs().run();
+	}
+	
+	private CmdMain useDefault() {
+		line("using default setting...");
+		String cryptoDriver = RSACryptoDriver.class.getName();
+		String isDataLock = "true";
+		String storeDriver = BinaryStoreDriver.class.getName();
+		Pair<Boolean, String> putResult = env.putVariable(Name.CRYPTO_DRIVER, cryptoDriver);
+		indent("use '"+cryptoDriver+"' as default setting for '"+Name.CRYPTO_DRIVER.name+"' "
+				+(putResult.first ? "successful" : "failed: "+putResult.second));
+		putResult = env.putVariable(Name.IS_DATA_LOCK, isDataLock);
+		indent("use '"+isDataLock+"' as default setting for '"+Name.IS_DATA_LOCK.name+"' "
+				+(putResult.first ? "successful" : "failed: "+putResult.second));
+		putResult = env.putVariable(Name.STORE_DRIVER, storeDriver);
+		indent("use '"+storeDriver+"' as default setting for '"+Name.STORE_DRIVER.name+"' "
+				+(putResult.first ? "successful" : "failed: "+putResult.second));
+		line("use default setting finished");
+		return this;
+	}
+	
+	private CmdMain loadUserPrefs() {
+		env.loadUserPrefs();
+		return this;
 	}
 	
 	private void run() {
 		try {
+			newLine();
 			line(String.format("Good %s %s, welcome to passwod-keeper ^_^", timePeriod(), user()));
 			prompt();
 			env.signalRunning();

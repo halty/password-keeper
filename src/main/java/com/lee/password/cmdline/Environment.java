@@ -224,22 +224,7 @@ public final class Environment {
 	
 	private State state;
 	
-	private Environment() {
-		signalEnter();
-		line("init password-keeper environment...");
-		for(Name name : Name.values()) {
-			String pref = getPref(name);
-			if(pref != null) {
-				Pair<Boolean, String> result = putVariable(name, pref);
-				if(result.first) {
-					indent("load preference variable '"+name.name+"' as '"+pref+"' successful");
-				}else {
-					indent("load preference variable '"+name.name+"' failed: "+result.second);
-				}
-			}
-		}
-		line("init password-keeper finished");
-	}
+	private Environment() { signalEnter(); }
 	
 	public void signalEnter() {
 		if(state != null) { throw new IllegalStateException("current state is null, can not enter"); }
@@ -260,6 +245,22 @@ public final class Environment {
 	public void exitNow() { signalExit(); }
 	
 	public boolean needExitSystem() { return state == State.EXIT; }
+	
+	public void loadUserPrefs() {
+		line("loading user preferences...");
+		for(Name name : Name.values()) {
+			String pref = getPref(name);
+			if(pref != null) {
+				Pair<Boolean, String> result = putVariable(name, pref);
+				if(result.first) {
+					indent("load preference variable '"+name.name+"' as '"+pref+"' successful");
+				}else {
+					indent("load preference variable '"+name.name+"' failed: "+result.second);
+				}
+			}
+		}
+		line("load user preferences finished");
+	}
 	
 	/**
 	 * <pre>
