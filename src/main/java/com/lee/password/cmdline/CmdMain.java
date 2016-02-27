@@ -38,13 +38,13 @@ public class CmdMain {
 		String isDataLock = "true";
 		String storeDriver = BinaryStoreDriver.class.getName();
 		Pair<Boolean, String> putResult = env.putVariable(Name.CRYPTO_DRIVER, cryptoDriver);
-		indent("use '"+cryptoDriver+"' as default setting for '"+Name.CRYPTO_DRIVER.name+"' "
+		indent("use '"+cryptoDriver+"' as default setting for variable '"+Name.CRYPTO_DRIVER.name+"' "
 				+(putResult.first ? "successful" : "failed: "+putResult.second));
 		putResult = env.putVariable(Name.IS_DATA_LOCK, isDataLock);
-		indent("use '"+isDataLock+"' as default setting for '"+Name.IS_DATA_LOCK.name+"' "
+		indent("use '"+isDataLock+"' as default setting for variable '"+Name.IS_DATA_LOCK.name+"' "
 				+(putResult.first ? "successful" : "failed: "+putResult.second));
 		putResult = env.putVariable(Name.STORE_DRIVER, storeDriver);
-		indent("use '"+storeDriver+"' as default setting for '"+Name.STORE_DRIVER.name+"' "
+		indent("use '"+storeDriver+"' as default setting for variable '"+Name.STORE_DRIVER.name+"' "
 				+(putResult.first ? "successful" : "failed: "+putResult.second));
 		line("use default setting finished");
 		return this;

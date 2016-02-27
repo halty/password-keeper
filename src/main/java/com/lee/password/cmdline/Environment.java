@@ -76,7 +76,7 @@ public final class Environment {
 		CRYPTO_DRIVER("cryptoDriver", "crypto driver for generate/load key and encrypt/decrypt data, "
 				+ "specify implementation with fully qualified class name") {
 			@Override
-			public Pair<Boolean, String> checkValid(String value) { return checkValidClass(this, value); }
+			public Pair<Boolean, String> checkValid(String value) { return checkValidClass(this, CryptoDriver.class, value); }
 			@Override
 			protected Class<? extends CryptoDriver> convert(String value) {
 				try {
@@ -103,7 +103,7 @@ public final class Environment {
 		STORE_DRIVER("storeDriver", "store driver for manage website and password data, "
 				+ "specify implementation with fully qualified class name") {
 			@Override
-			public Pair<Boolean, String> checkValid(String value) { return checkValidClass(this, value); }
+			public Pair<Boolean, String> checkValid(String value) { return checkValidClass(this, StoreDriver.class, value); }
 			@Override
 			protected Class<? extends StoreDriver> convert(String value) {
 				try {
@@ -134,12 +134,12 @@ public final class Environment {
 			return Pair.create(true, "success");
 		}
 		
-		static Pair<Boolean, String> checkValidClass(Name name, String value) {
+		static Pair<Boolean, String> checkValidClass(Name name, Class<?> expectedClass, String value) {
 			if(value == null) { return Pair.create(false, "the value of variable '" + name + "' is null"); }
 			try {
 				Class<?> clazz = Class.forName(value);
-				if(!CryptoDriver.class.isAssignableFrom(clazz)) {
-					return Pair.create(false, "the specified type of value of variable '" + name + "' is not compatible with "+CryptoDriver.class);
+				if(!expectedClass.isAssignableFrom(clazz)) {
+					return Pair.create(false, "the specified type of value of variable '" + name + "' is not compatible with "+expectedClass);
 				}
 				return Pair.create(true, "success");
 			}catch(Exception e) {
