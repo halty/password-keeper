@@ -279,7 +279,8 @@ public enum CmdArgs {
 	
 	@SuppressWarnings("unchecked")
 	ADD_PWD_ARGS(
-		triple("-i", true, LONG_CONVERTER),
+		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
 		triple("-n", true, STRING_CONVERTER),
 		triple("-p", true, STRING_CONVERTER),
 		triple("-m", false, STRING_CONVERTER)
@@ -307,7 +308,8 @@ public enum CmdArgs {
 	
 	@SuppressWarnings("unchecked")
 	REMOVE_PWD_ARGS(
-		triple("-i", true, LONG_CONVERTER),
+		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
 		triple("-n", true, STRING_CONVERTER)
 	) {
 		@Override
@@ -330,7 +332,8 @@ public enum CmdArgs {
 	
 	@SuppressWarnings("unchecked")
 	CHANGE_PWD_ARGS(
-		triple("-i", true, LONG_CONVERTER),
+		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
 		triple("-n", true, STRING_CONVERTER),
 		triple("-p", false, STRING_CONVERTER),
 		triple("-m", false, STRING_CONVERTER)
@@ -361,7 +364,8 @@ public enum CmdArgs {
 	
 	@SuppressWarnings("unchecked")
 	QUERY_PWD_ARGS(
-		triple("-i", true, LONG_CONVERTER),
+		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
 		triple("-n", true, STRING_CONVERTER)
 	) {
 		@Override
@@ -385,6 +389,7 @@ public enum CmdArgs {
 	@SuppressWarnings("unchecked")
 	COUNT_PWD_ARGS(
 		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
 		triple("-n", false, STRING_CONVERTER)
 	) {
 		@Override
@@ -403,6 +408,7 @@ public enum CmdArgs {
 	@SuppressWarnings("unchecked")
 	LIST_PWD_ARGS(
 		triple("-i", false, LONG_CONVERTER),
+		triple("-k", false, STRING_CONVERTER),
 		triple("-n", false, STRING_CONVERTER)
 	) {
 		@Override

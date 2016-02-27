@@ -30,8 +30,8 @@ public class GenerateKeyCommand implements Command {
 				line("failed to generate key: "+keyPairResult.msg);
 			}else {
 				line("generate key successful:");
-				indent("public key file -- "+keyPairResult.result[0]);
-				indent("private key file -- "+keyPairResult.result[1]);
+				indent("public key file -- "+keyPairResult.result[0].path());
+				indent("private key file -- "+keyPairResult.result[1].path());
 			}
 		}
 		prompt();

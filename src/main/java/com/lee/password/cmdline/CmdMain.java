@@ -12,6 +12,7 @@ import java.nio.charset.Charset;
 import java.util.Calendar;
 
 import com.lee.password.cmdline.Environment.Name;
+import com.lee.password.cmdline.commands.ExitCommand;
 import com.lee.password.keeper.impl.crypto.RSACryptoDriver;
 import com.lee.password.keeper.impl.store.BinaryStoreDriver;
 import com.lee.password.util.Pair;
@@ -64,6 +65,7 @@ public class CmdMain {
 			
 			String line = null;
 			while(!env.needExitSystem() && (line = stdin.readLine()) != null) {
+				if(line.trim().isEmpty()) { continue; }
 				Command command = Cmd.parse(line);
 				command.execute();
 			}
@@ -71,7 +73,8 @@ public class CmdMain {
 			newLine();
 		}catch(Exception e) {
 			printStackTrace(e);
-			line("exit for unexpected exception: "+e.getMessage());
+			line("interrupted from unexpected exception: "+e.getMessage());
+			new ExitCommand().execute();
 		}
 	}
 	
