@@ -42,7 +42,8 @@ public class AddPwdCommand extends BasePwdCommand {
 					long websiteId = triple.third;
 					CryptoKey encryptionKey = encryptionKeyResult.third;
 					Password pwd = new Password(websiteId, username);
-					pwd.password(password).keyValuePairs(memo);
+					pwd.password(password);
+					if(memo != null) { pwd.keyValuePairs(memo); }
 					
 					Result<Header> addResult = storeDriver.insertPassword(pwd, encryptionKey);
 					if(!addResult.isSuccess()) {

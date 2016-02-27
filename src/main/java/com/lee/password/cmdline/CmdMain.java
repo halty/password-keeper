@@ -65,7 +65,10 @@ public class CmdMain {
 			
 			String line = null;
 			while(!env.needExitSystem() && (line = stdin.readLine()) != null) {
-				if(line.trim().isEmpty()) { continue; }
+				if(line.trim().isEmpty()) {
+					prompt();
+					continue;
+				}
 				Command command = Cmd.parse(line);
 				command.execute();
 			}

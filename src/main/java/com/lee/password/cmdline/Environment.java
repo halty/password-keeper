@@ -443,11 +443,11 @@ public final class Environment {
 			return Triple.create(false, "failed to get dependency variable '"+Name.CRYPTO_DRIVER+"': "+cryptoDriverTriple.second, null);
 		}
 		CryptoDriver cryptoDriver = cryptoDriverTriple.third;
-		Triple<Boolean, String, CryptoKey> encryptionKeyTriple = getEncryptionKey();
-		if(!encryptionKeyTriple.first) {
-			return Triple.create(false, "failed to get dependency variable '"+Name.PRIVATE_KEY_DIR+"': "+encryptionKeyTriple.second, null);
+		Triple<Boolean, String, CryptoKey> decryptionKeyTriple = getDecryptionKey();
+		if(!decryptionKeyTriple.first) {
+			return Triple.create(false, "failed to get dependency variable '"+Name.PRIVATE_KEY_DIR+"': "+decryptionKeyTriple.second, null);
 		}
-		int secretBlockSize = encryptionKeyTriple.third.maxBlockSize();
+		int secretBlockSize = decryptionKeyTriple.third.maxBlockSize();
 		Triple<Boolean, String, Boolean> isDataLockTriple = getVariable(Name.IS_DATA_LOCK, Boolean.class);
 		if(!isDataLockTriple.first) {
 			return Triple.create(false, "failed to get dependency variable '"+Name.IS_DATA_LOCK+"': "+isDataLockTriple.second, null);
