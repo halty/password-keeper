@@ -5,7 +5,9 @@ import static com.lee.password.cmdline.Environment.line;
 import static com.lee.password.cmdline.Environment.newLine;
 import static com.lee.password.cmdline.Environment.prompt;
 
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.lee.password.cmdline.Cmd;
 import com.lee.password.keeper.api.Result;
@@ -46,19 +48,21 @@ public class ListPwdCommand extends BasePwdCommand {
 							}else {
 								Header header = listResult.result;
 								if(header != null) {
+									Triple<Boolean, String, String> keywordTriple = mapToWebsiteKeyword(storeDriver, header.websiteId());
+									String keyword = keywordTriple.first ? keywordTriple.third : keywordTriple.second;	// error info
 									line("there are 1 password");
-									printPassword(header);
+									printPassword(header, keyword);
 								}else {
 									line("there are no passwords");
 								}
 							}
 						}else {
 							Result<List<Header>> pwdListResult = storeDriver.listPassword(websiteId);
-							printPasswordList(pwdListResult);
+							printPasswordList(storeDriver, pwdListResult);
 						}
 					}else {
 						Result<List<Header>> pwdListResult = storeDriver.listPassword(username);
-						printPasswordList(pwdListResult);
+						printPasswordList(storeDriver, pwdListResult);
 					}
 				}
 			}
@@ -66,7 +70,7 @@ public class ListPwdCommand extends BasePwdCommand {
 		prompt();
 	}
 	
-	private void printPasswordList(Result<List<Header>> pwdListResult) {
+	private void printPasswordList(StoreDriver storeDriver, Result<List<Header>> pwdListResult) {
 		if(!pwdListResult.isSuccess()) {
 			line("failed to list password: "+pwdListResult.msg);
 		}else {
@@ -76,8 +80,15 @@ public class ListPwdCommand extends BasePwdCommand {
 				line("there are no passwords");
 			}else {
 				line("there are " + size + " passwords:");
+				Map<Long, String> idKeywordMap = new HashMap<Long, String>(size);
 				for(Header pwd : pwdList) {
-					printPassword(pwd);
+					String keyword = idKeywordMap.get(pwd.websiteId());
+					if(keyword == null) {
+						Triple<Boolean, String, String> keywordTriple = mapToWebsiteKeyword(storeDriver, pwd.websiteId());
+						keyword = keywordTriple.first ? keywordTriple.third : keywordTriple.second;	// error info
+						idKeywordMap.put(pwd.websiteId(), keyword);
+					}
+					printPassword(pwd, keyword);
 					if(--size > 0) { newLine(); }
 				}
 			}

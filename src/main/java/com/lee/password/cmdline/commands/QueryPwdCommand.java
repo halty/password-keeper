@@ -44,8 +44,10 @@ public class QueryPwdCommand extends BasePwdCommand {
 						line("failed to query password: "+queryResult.msg);
 					}else {
 						Password pwd = queryResult.result;
+						Triple<Boolean, String, String> keywordTriple = mapToWebsiteKeyword(storeDriver, pwd.header().websiteId());
+						String keyword = keywordTriple.first ? keywordTriple.third : keywordTriple.second;	// error info
 						line("query password successful:");
-						printPassword(pwd);
+						printPassword(pwd, keyword);
 					}
 				}
 			}

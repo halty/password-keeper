@@ -55,18 +55,28 @@ public abstract class BasePwdCommand implements Command {
 		}
 	}
 	
-	protected void printPassword(Password password) {
+	protected Triple<Boolean, String, String> mapToWebsiteKeyword(StoreDriver storeDriver, long websiteId) {
+		Result<Website> websiteResult = storeDriver.selectWebsite(new Website(websiteId));
+		if(!websiteResult.isSuccess()) {
+			return Triple.create(false, "can not find website by websiteId '"+websiteId+"'", null);
+		}
+		return Triple.create(true, "success", websiteResult.result.keyword());
+	}
+	
+	protected void printPassword(Password password, String websiteKeyword) {
 		Header header = password.header();
 		Secret secret = password.secret();
 		indent("websiteId -- " + header.websiteId());
+		indent("websiteKeyword -- " + websiteKeyword);
 		indent("username -- " + header.username());
 		indent("password -- " + secret.password());
 		indent("memo -- " + secret.keyValuePairs());
 		indent("lastChangedTime -- " + format(header.timestamp()));
 	}
 	
-	protected void printPassword(Header header) {
+	protected void printPassword(Header header, String websiteKeyword) {
 		indent("websiteId -- " + header.websiteId());
+		indent("websiteKeyword -- " + websiteKeyword);
 		indent("username -- " + header.username());
 		indent("lastChangedTime -- " + format(header.timestamp()));
 	}
