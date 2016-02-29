@@ -1065,7 +1065,7 @@ public class BinaryStoreDriver implements StoreDriver {
 	
 	private Result<Entity> undoUpdate(ChangedOperation<? extends InternalEntity> last) {
 		InternalEntity before = last.before();
-		InternalEntity after = last.before();
+		InternalEntity after = last.after();
 		Entity entity = null;
 		if(after.type() == Type.WEBSITE) {
 			BinaryWebsite oldWebsite = (BinaryWebsite) before;
@@ -1175,7 +1175,7 @@ public class BinaryStoreDriver implements StoreDriver {
 
 	private Result<Entity> redoUpdate(ChangedOperation<? extends InternalEntity> last) {
 		InternalEntity before = last.before();
-		InternalEntity after = last.before();
+		InternalEntity after = last.after();
 		Entity entity = null;
 		if(after.type() == Type.WEBSITE) {
 			BinaryWebsite oldWebsite = (BinaryWebsite) before;
