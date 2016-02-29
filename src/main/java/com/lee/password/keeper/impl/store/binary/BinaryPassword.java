@@ -25,7 +25,7 @@ public class BinaryPassword implements InternalEntity {
 	
 	private final long websiteId;
 	private final byte[] username;
-	private final long timestamp;
+	private long timestamp;
 	private byte[] encryptedPassword;
 	private byte[] encryptedKeyValuePairs;
 	
@@ -197,6 +197,8 @@ public class BinaryPassword implements InternalEntity {
 	public String username() { return Base64Variants.decode(username, CHARSET); }
 
 	public long timestamp() { return timestamp; }
+	
+	public void timestamp(long timestamp) { this.timestamp = timestamp; }
 
 	public byte[] encryptedPassword() { return encryptedPassword; }
 

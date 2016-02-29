@@ -46,14 +46,7 @@ public class ByteMask {
 	private static byte mask(int index, byte b) { return flip(index, xor(index, b)); }
 	
 	private static byte xor(int index, byte b) { return (byte) (b ^ index); }
-	private static byte flip(int index, byte b) {
-		switch(b) {
-		case Byte.MIN_VALUE:
-			return b;
-		default:
-			return (index & 0x01) != 0 ? b : (byte)(~b);
-		}
-	}
+	private static byte flip(int index, byte b) { return (index & 0x01) != 0 ? b : (byte)(~b); }
 	
 	/**
 	 * get {@code length} bytes from {@code srcBuf} and unmask them.

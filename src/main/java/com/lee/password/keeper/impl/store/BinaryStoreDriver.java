@@ -521,6 +521,7 @@ public class BinaryStoreDriver implements StoreDriver {
 						newBiWebsite.changeUrl(url);
 						oldBiWebsite.markUrlChanged();
 					}
+					newBiWebsite.timestamp(System.currentTimeMillis());
 				}else {
 					if(biWebsite != biWebsite2) {
 						return new Result<Website>(Code.FAIL, "conflict with existed keyword");
@@ -532,6 +533,7 @@ public class BinaryStoreDriver implements StoreDriver {
 					newBiWebsite = biWebsite2.copy();
 					newBiWebsite.changeUrl(url);
 					oldBiWebsite.markUrlChanged();
+					newBiWebsite.timestamp(System.currentTimeMillis());
 				}
 			}else {
 				if(url == null || url.isEmpty() || biWebsite2.url().equals(url)) {
@@ -541,6 +543,7 @@ public class BinaryStoreDriver implements StoreDriver {
 				newBiWebsite = biWebsite2.copy();
 				newBiWebsite.changeUrl(url);
 				oldBiWebsite.markUrlChanged();
+				newBiWebsite.timestamp(System.currentTimeMillis());
 				website.keyword(biWebsite2.keyword());
 			}
 		}else {
@@ -553,6 +556,7 @@ public class BinaryStoreDriver implements StoreDriver {
 			newBiWebsite = biWebsite.copy();
 			newBiWebsite.changeUrl(url);
 			oldBiWebsite.markUrlChanged();
+			newBiWebsite.timestamp(System.currentTimeMillis());
 			website.id(biWebsite.websiteId());
 		}
 		if(appendUpdateOperation(oldBiWebsite, newBiWebsite)) {
@@ -587,8 +591,12 @@ public class BinaryStoreDriver implements StoreDriver {
 				return false;
 			}
 			biWebsite.keyword(newKeyword);
+			biWebsite.timestamp(newWebsite.timestamp());
 		}
-		if(newWebsite.isUrlChanged()) { biWebsite.url(newWebsite.url()); }
+		if(newWebsite.isUrlChanged()) {
+			biWebsite.url(newWebsite.url());
+			biWebsite.timestamp(newWebsite.timestamp());
+		}
 		return true;
 	}
 
@@ -871,9 +879,11 @@ public class BinaryStoreDriver implements StoreDriver {
 	private void replace(BinaryPassword existedPassword, BinaryPassword newPassword) {
 		if(newPassword.isEncryptedPasswordChanged()) {
 			existedPassword.encryptedPassword(newPassword.encryptedPassword());
+			existedPassword.timestamp(newPassword.timestamp());
 		}
 		if(newPassword.isEncryptedKeyValuePairsChanged()) {
 			existedPassword.encryptedKeyValuePairs(newPassword.encryptedKeyValuePairs());
+			existedPassword.timestamp(newPassword.timestamp());
 		}
 	}
 
